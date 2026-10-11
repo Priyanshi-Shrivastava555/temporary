@@ -58,7 +58,11 @@ def create_app() -> FastAPI:
 
     @app.get("/health", tags=["system"])
     def health() -> dict:
-        isolated_langflow = Path(__file__).resolve().parents[1] / ".langflow-venv" / "Scripts" / "langflow.exe"
+        isolated_root = Path(__file__).resolve().parents[1] / ".langflow-venv"
+        isolated_langflow = (
+            (isolated_root / "Scripts" / "langflow.exe").exists()
+            or (isolated_root / "bin" / "langflow").exists()
+        )
         return {
             "status": "ok",
             "database": "sqlite",
@@ -68,7 +72,7 @@ def create_app() -> FastAPI:
                 "langgraph": package_installed("langgraph"),
                 "crewai": package_installed("crewai"),
                 "autogen": package_installed("autogen-agentchat"),
-                "langflow": package_installed("langflow") or isolated_langflow.exists(),
+                "langflow": package_installed("langflow") or isolated_langflow,
             },
         }
 

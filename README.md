@@ -39,14 +39,38 @@ nvm install 22
 nvm use 22
 ```
 
-Then start both services from the project directory:
+Then make the launcher executable:
 
 ```bash
 chmod +x start.sh
-./start.sh
 ```
 
-The first run installs dependencies. Later starts can skip that check with `./start.sh --no-install`. The storefront is available at `http://127.0.0.1:5173`, API documentation at `http://127.0.0.1:8000/docs`, and service logs under `logs/`.
+Start the profile that is being evaluated. A named phase performs a clean restart, applies the correct workflow mode, starts the required services, and automatically runs that phase's smoke test:
+
+| Command | Runtime and checks |
+|---|---|
+| `./start.sh --phase1` | LangFlow, FastAPI, React, saved visual flow, five tools, and the six Phase 1 queries |
+| `./start.sh --phase2` | CrewAI mode, FastAPI, React, three-agent structure, tools, and the five Phase 2 queries |
+| `./start.sh --phase3` | AutoGen mode, FastAPI, React, group-chat/tool execution, reset behavior, and the five Phase 3 queries |
+| `./start.sh --phase4` | LangGraph mode, FastAPI, React, conditional routing, required queries, and multi-turn memory |
+| `./start.sh --phase5` | React production build, local deployment readiness, FastAPI health, and end-to-end shopping queries |
+
+The first run installs application dependencies. Phase 1 additionally installs the large isolated LangFlow dependency set, so its first run can take several minutes. Later runs can use `./start.sh --phaseN --no-install`. The Phase 1 launcher creates or updates the saved **Shop Buddy** flow in LangFlow automatically.
+
+- Storefront: `http://127.0.0.1:5173`
+- FastAPI documentation: `http://127.0.0.1:8000/docs`
+- LangFlow for Phase 1: `http://127.0.0.1:7860`
+- Logs: `logs/`
+
+All smoke tests use disposable cart sessions and clean up afterwards. When an AI key is present, Phase 1 also invokes the live LangFlow flow, while Phase 2 and Phase 3 require their real AI runtimes to complete without falling back. Without a key, deterministic API behavior and framework structure remain testable, while live provider execution is reported as skipped.
+
+The services run with `nohup`, which is why no terminal remains open. Stop every process managed by the launcher with:
+
+```bash
+./start.sh --stop
+```
+
+The `.env` template contains every variable named in Phase 1: `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `ODOO_ENDPOINT`, `ODOO_DB_NAME`, `ODOO_ADMIN_USERNAME`, and `ODOO_ADMIN_PASSWORD`. The proxy URL is preconfigured, but secret values and deployment-specific Odoo values must be supplied by the operator. The self-contained build uses SQLite, as allowed for this implementation, so the Odoo values are reserved for a future Odoo adapter. Phase selection uses a process-only override and never rewrites `.env`.
 
 The reference proxy belongs in `OPENAI_BASE_URL`. If you use an official OpenAI key instead of that proxy, leave `OPENAI_BASE_URL` empty so the SDK uses `https://api.openai.com/v1`. Gemini defaults to the current `gemini-3.5-flash` model; either model remains configurable in `.env`.
 

@@ -45,3 +45,13 @@ def test_health_reports_real_framework_installation(tmp_path, monkeypatch):
     assert body["frameworks"]["crewai"] is True
     assert body["frameworks"]["autogen"] is True
 
+
+def test_launcher_workflow_override_wins_without_rewriting_env(tmp_path, monkeypatch):
+    monkeypatch.setenv("SHOP_BUDDY_DB_PATH", str(tmp_path / "phase.db"))
+    monkeypatch.setenv("WORKFLOW_MODE", "langgraph")
+    monkeypatch.setenv("SHOP_BUDDY_WORKFLOW_OVERRIDE", "crewai")
+
+    body = TestClient(create_app()).get("/health").json()
+
+    assert body["workflow"] == "crewai"
+

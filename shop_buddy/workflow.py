@@ -88,7 +88,7 @@ class ShopWorkflow:
             search = True
         price_match = re.search(r"\b(?:under|below|less than|budget of)\s*\$?\s*([\d,]+(?:\.\d{1,2})?)", lowered)
         max_price = float(price_match.group(1).replace(",", "")) if price_match else None
-        cleanup = re.sub(r"\b(show|find|search|recommend|browse|looking|for|i|need|want|please|can|you|me|an?|the|and|add|put|buy|purchase|to|my|cart|update|change|quantity|qty|remove|delete|from|under|below|less|than|budget|of|it|one|first|second|third|fourth|fifth|make|set)\b", " ", lowered)
+        cleanup = re.sub(r"\b(show|find|search|recommend|browse|looking|for|i|need|want|please|can|you|me|an?|the|and|add|put|buy|purchase|to|my|cart|update|change|increase|decrease|quantity|qty|remove|delete|from|under|below|less|than|budget|of|it|its|this|that|one|first|second|third|fourth|fifth|make|set)\b", " ", lowered)
         cleanup = re.sub(r"\$?\d+(?:,\d{3})*(?:\.\d+)?", " ", cleanup)
         cleanup = re.sub(r"[^a-z0-9\s-]", " ", cleanup)
         search_query = re.sub(r"\s+", " ", cleanup).strip()

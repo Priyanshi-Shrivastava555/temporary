@@ -39,6 +39,6 @@ def get_settings() -> Settings:
         # Gemini 2.0 Flash was shut down on 2026-06-01. Keep a current,
         # configurable default so adding only GEMINI_API_KEY is sufficient.
         gemini_model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
-        workflow_mode=os.getenv("WORKFLOW_MODE", "langgraph").lower(),
+        workflow_mode=(os.getenv("SHOP_BUDDY_WORKFLOW_OVERRIDE") or os.getenv("WORKFLOW_MODE", "langgraph")).lower(),
     )
 

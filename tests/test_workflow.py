@@ -55,6 +55,18 @@ def test_memory_survives_a_new_langgraph_workflow_instance(tmp_path):
     assert result["cart"]["items"][0]["title"] == "Cedar Executive Chair"
 
 
+def test_possessive_pronoun_updates_previously_selected_product(tmp_path):
+    workflow = make_workflow(tmp_path)
+    session = "possessive-follow-up"
+    workflow.run("Show me office chairs under $500.", session)
+    workflow.run("Add the second one to my cart.", session)
+
+    result = workflow.run("Increase its quantity to 3.", session)
+
+    assert result["cart"]["items"][0]["title"] == "Cedar Executive Chair"
+    assert result["cart"]["items"][0]["quantity"] == 3
+
+
 def test_reference_acceptance_queries_work_without_an_api_key(tmp_path):
     workflow = make_workflow(tmp_path)
     session = "brief-acceptance"

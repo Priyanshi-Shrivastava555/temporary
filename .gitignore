@@ -10,5 +10,6 @@ __pycache__/
 data/*.db
 logs/
 .langflow-data/
+.runtime-data/
 .coverage
 
