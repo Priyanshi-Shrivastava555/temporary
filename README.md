@@ -55,7 +55,16 @@ Start the profile that is being evaluated. A named phase performs a clean restar
 | `./start.sh --phase4` | LangGraph mode, FastAPI, React, conditional routing, required queries, and multi-turn memory |
 | `./start.sh --phase5` | React production build, local deployment readiness, FastAPI health, and end-to-end shopping queries |
 
-The first run installs application dependencies. Phase 1 additionally installs the large isolated LangFlow dependency set, so its first run can take several minutes. Later runs can use `./start.sh --phaseN --no-install`. The Phase 1 launcher creates or updates the saved **Shop Buddy** flow in LangFlow automatically.
+For a disk-constrained evaluation VM that checks only the documented API scenarios, skip the project frontend entirely:
+
+```bash
+./start.sh --phase1 --api-only
+./start.sh --phase2 --api-only
+```
+
+In API-only mode, Node.js, npm, `frontend/node_modules`, and port 5173 are not required. The complete Python backend environment is still installed, including LangGraph, CrewAI, and AutoGen, so switching phases does not change or weaken backend behavior. Phase 1 still starts its separately isolated LangFlow service on port 7860, while Phase 2 starts the CrewAI-configured FastAPI service on port 8000.
+
+The first run must omit `--no-install` so application dependencies are installed. Phase 1 additionally installs the large isolated LangFlow dependency set, so its first run can take several minutes. Later runs can use `./start.sh --phaseN --no-install`; the launcher checks that both environments are complete before starting. The Phase 1 launcher creates or updates the saved **Shop Buddy** flow in LangFlow automatically.
 
 - Storefront: `http://127.0.0.1:5173`
 - FastAPI documentation: `http://127.0.0.1:8000/docs`

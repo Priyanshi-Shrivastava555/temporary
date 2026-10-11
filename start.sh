@@ -10,12 +10,13 @@ phase_requested=false
 no_install=false
 run_smoke=false
 stop_only=false
+api_only=false
 
 usage() {
     cat <<'EOF'
 Usage:
-  ./start.sh --phase1 [--no-install]   LangFlow + FastAPI + React + Phase 1 smoke test
-  ./start.sh --phase2 [--no-install]   CrewAI + FastAPI + React + Phase 2 smoke test
+  ./start.sh --phase1 [--api-only] [--no-install]   LangFlow + FastAPI + Phase 1 smoke test
+  ./start.sh --phase2 [--api-only] [--no-install]   CrewAI + FastAPI + Phase 2 smoke test
   ./start.sh --phase3 [--no-install]   AutoGen + FastAPI + React + Phase 3 smoke test
   ./start.sh --phase4 [--no-install]   LangGraph + FastAPI + React + Phase 4 smoke test
   ./start.sh --phase5 [--no-install]   Deployment-readiness profile + Phase 5 smoke test
@@ -38,6 +39,7 @@ for argument in "$@"; do
             ;;
         --smoke-test) run_smoke=true ;;
         --no-install) no_install=true ;;
+        --api-only) api_only=true ;;
         --stop) stop_only=true ;;
         -h|--help) usage; exit 0 ;;
         *) echo "Unknown option: $argument" >&2; usage; exit 2 ;;
@@ -97,7 +99,16 @@ case "$phase" in
     phase4|phase5) workflow_mode="langgraph"; needs_langflow=false ;;
 esac
 
-for command_name in python3 node npm setsid; do
+if [[ "$phase" == "phase5" && "$api_only" == true ]]; then
+    echo "Phase 5 includes frontend deployment readiness and cannot use --api-only." >&2
+    exit 2
+fi
+
+required_commands=(python3 setsid)
+if [[ "$api_only" == false ]]; then
+    required_commands+=(node npm)
+fi
+for command_name in "${required_commands[@]}"; do
     if ! command -v "$command_name" >/dev/null 2>&1; then
         echo "$command_name was not found in PATH. See the Linux setup section in README.md." >&2
         exit 1
@@ -105,7 +116,9 @@ for command_name in python3 node npm setsid; do
 done
 
 python3 -c 'import sys; assert (3, 11) <= sys.version_info[:2] < (3, 13), "Shop Buddy requires Python 3.11 or 3.12"'
-node -e 'const [major, minor] = process.versions.node.split(".").map(Number); if (!((major === 20 && minor >= 19) || (major === 22 && minor >= 12) || major > 22)) { console.error("Shop Buddy requires Node 20.19+ or Node 22.12+"); process.exit(1); }'
+if [[ "$api_only" == false ]]; then
+    node -e 'const [major, minor] = process.versions.node.split(".").map(Number); if (!((major === 20 && minor >= 19) || (major === 22 && minor >= 12) || major > 22)) { console.error("Shop Buddy requires Node 20.19+ or Node 22.12+"); process.exit(1); }'
+fi
 
 venv_python="$project_root/.venv/bin/python"
 if [[ ! -x "$venv_python" ]]; then
@@ -127,11 +140,28 @@ if [[ "$needs_langflow" == true && ! -x "$langflow_python" ]]; then
     python3 -m venv "$project_root/.langflow-venv"
 fi
 
+if [[ "$no_install" == true ]]; then
+    if ! "$venv_python" -c 'import fastapi, requests, langgraph, crewai, autogen' >/dev/null 2>&1; then
+        echo "The application environment is incomplete. Run ./start.sh --$phase once without --no-install." >&2
+        exit 1
+    fi
+    if [[ "$api_only" == false && ! -x "$project_root/frontend/node_modules/.bin/vite" ]]; then
+        echo "Frontend dependencies are missing. Run ./start.sh --$phase once without --no-install." >&2
+        exit 1
+    fi
+    if [[ "$needs_langflow" == true ]] && ! "$langflow_python" -c 'import langflow, requests' >/dev/null 2>&1; then
+        echo "The LangFlow environment is incomplete. Run ./start.sh --phase1 once without --no-install." >&2
+        exit 1
+    fi
+fi
+
 if [[ "$no_install" == false ]]; then
-    echo "Installing/verifying application packages..."
+    echo "Installing/verifying the complete backend environment..."
     "$venv_python" -m pip install --upgrade pip
     "$venv_python" -m pip install -r "$project_root/requirements.txt"
-    (cd "$project_root/frontend" && npm install)
+    if [[ "$api_only" == false ]]; then
+        (cd "$project_root/frontend" && npm install)
+    fi
 
     if [[ "$needs_langflow" == true ]]; then
         if ! "$langflow_python" -c 'from importlib.metadata import version; assert version("langflow") == "1.12.5"' >/dev/null 2>&1; then
@@ -188,7 +218,7 @@ if ! port_open 8000; then
     echo $! >"$project_root/logs/api.pid"
 fi
 
-if ! port_open 5173; then
+if [[ "$api_only" == false ]] && ! port_open 5173; then
     echo "Starting React frontend..."
     (
         cd "$project_root/frontend"
@@ -206,7 +236,9 @@ if [[ "$needs_langflow" == true ]] && ! port_open 7860; then
 fi
 
 services_ready() {
-    port_open 8000 && port_open 5173 && { [[ "$needs_langflow" == false ]] || port_open 7860; }
+    port_open 8000 \
+        && { [[ "$api_only" == true ]] || port_open 5173; } \
+        && { [[ "$needs_langflow" == false ]] || port_open 7860; }
 }
 
 wait_limit=90
@@ -220,7 +252,7 @@ for attempt in $(seq 1 "$wait_limit"); do
 done
 
 if ! port_open 8000; then echo "FastAPI did not start. Check logs/api-error.log." >&2; exit 1; fi
-if ! port_open 5173; then echo "React did not start. Check logs/frontend-error.log." >&2; exit 1; fi
+if [[ "$api_only" == false ]] && ! port_open 5173; then echo "React did not start. Check logs/frontend-error.log." >&2; exit 1; fi
 if [[ "$needs_langflow" == true ]] && ! port_open 7860; then
     echo "LangFlow did not start. Check logs/langflow-error.log." >&2
     exit 1
@@ -240,7 +272,11 @@ fi
 
 echo
 echo "Shop Buddy $phase is ready."
-echo "  Storefront: http://127.0.0.1:5173"
+if [[ "$api_only" == false ]]; then
+    echo "  Storefront: http://127.0.0.1:5173"
+else
+    echo "  Storefront: skipped (--api-only)"
+fi
 echo "  API docs:   http://127.0.0.1:8000/docs"
 if [[ "$needs_langflow" == true ]]; then
     echo "  LangFlow:   http://127.0.0.1:7860"

@@ -2,3 +2,4 @@
 # dependency tree than the application runtime. Install it only when editing
 # or evaluating the exported visual workflow.
 langflow==1.12.5
+requests>=2.32,<3.0
