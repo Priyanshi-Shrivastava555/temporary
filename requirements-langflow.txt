@@ -1,0 +1,4 @@
+# LangFlow is an optional visual authoring service and has a much larger
+# dependency tree than the application runtime. Install it only when editing
+# or evaluating the exported visual workflow.
+langflow==1.12.5

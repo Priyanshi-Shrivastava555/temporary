@@ -1,0 +1,14 @@
+.env
+.venv/
+.langflow-venv/
+frontend/node_modules/
+frontend/dist/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.streamlit/
+data/*.db
+logs/
+.langflow-data/
+.coverage
+
