@@ -2,15 +2,51 @@
 
 Shop Buddy is a conversational shopping assistant with a FastAPI backend, a modern React interface, a SQLite product/cart store, and a stateful agent-style workflow. It supports product discovery, price and category filters, add/update/remove/view-cart actions, combined search-and-add requests, and follow-ups such as "add the second one".
 
+## Runtime versions
+
+- **Python:** 3.11 or 3.12; Python 3.12 is recommended and is the version used for the full local verification.
+- **Node.js:** 20.19+ or 22.12+; Node 22 LTS is recommended. Node 24 is also supported.
+- **npm:** the version bundled with the supported Node.js release.
+
+Python 3.13+ is intentionally not selected yet because the agent framework dependency set is verified on Python 3.11/3.12. The frontend's Node constraint is also recorded in `frontend/package.json`, and `.nvmrc` selects Node 22.
+
 ## Quick start on Windows
 
-Prerequisites: Python 3.11+ and Node.js 20+ must be installed and available in `PATH`.
+Prerequisites: a supported Python and Node.js version from the table above must be installed and available in `PATH`.
 
 1. Copy `.env.example` to `.env` and optionally add an AI key.
 2. Run `start.cmd` (or `powershell -ExecutionPolicy Bypass -File .\start.ps1`).
 3. Open `http://127.0.0.1:5173`. API docs are at `http://127.0.0.1:8000/docs`.
 
 The first launch creates a local Python virtual environment and installs the backend and frontend packages. The app works without an AI key: its deterministic shopping tools and LangGraph memory still execute all operations. Provider order is OpenAI, then Gemini, then local response generation. Gemini is also attempted when OpenAI is configured but its gateway is unavailable. No request is sent to either provider when no key exists.
+
+## Quick start on Linux
+
+On Ubuntu 24.04 or Debian 12, install Python and the virtual-environment tools:
+
+```bash
+sudo apt update
+sudo apt install -y python3 python3-venv python3-pip curl
+```
+
+Install Node 22 with `nvm` (the version manager's official install method):
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | bash
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+nvm install 22
+nvm use 22
+```
+
+Then start both services from the project directory:
+
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+The first run installs dependencies. Later starts can skip that check with `./start.sh --no-install`. The storefront is available at `http://127.0.0.1:5173`, API documentation at `http://127.0.0.1:8000/docs`, and service logs under `logs/`.
 
 The reference proxy belongs in `OPENAI_BASE_URL`. If you use an official OpenAI key instead of that proxy, leave `OPENAI_BASE_URL` empty so the SDK uses `https://api.openai.com/v1`. Gemini defaults to the current `gemini-3.5-flash` model; either model remains configurable in `.env`.
 
