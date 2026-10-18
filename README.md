@@ -83,6 +83,8 @@ The `.env` template contains every variable named in Phase 1: `OPENAI_API_KEY`, 
 
 If a previous Phase 1 run saved an older copy of the flow, restart it with `./start.sh --stop` followed by `./start.sh --phase1 --no-install`. Registration compares executable component code, prompts, outputs, and tool handles and updates stale flows automatically. Use `SHOP_BUDDY_AI_PROVIDER=openai` or `gemini` only when you intentionally want to disable automatic provider fallback.
 
+Phase 1 also creates and verifies a LangFlow service API key, saves it as `LANGFLOW_API_KEY` in the ignored local `.env`, and uses that key for the smoke run. This is distinct from `OPENAI_API_KEY`: it authenticates the VDI evaluator to LangFlow itself and is never committed.
+
 The reference proxy belongs in `OPENAI_BASE_URL`. If you use an official OpenAI key instead of that proxy, leave `OPENAI_BASE_URL` empty so the SDK uses `https://api.openai.com/v1`. Gemini defaults to the current `gemini-3.5-flash` model; either model remains configurable in `.env`.
 
 ## Accounts and personalization

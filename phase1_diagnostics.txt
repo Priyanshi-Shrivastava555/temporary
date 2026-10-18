@@ -1,0 +1,1 @@
+Run ./start.sh --phase1 on the VDI to replace this placeholder with a redacted evaluator-readiness report.

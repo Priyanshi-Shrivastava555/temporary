@@ -261,14 +261,13 @@ class PhaseSmokeTest:
 
     def verify_langflow(self) -> None:
         self.current_check = "LangFlow authentication"
-        session = requests.Session()
-        login = session.get(f"{self.langflow_url}/api/v1/auto_login", timeout=30)
-        if not login.ok:
+        langflow_api_key = os.getenv("LANGFLOW_API_KEY", "").strip()
+        if not langflow_api_key:
             raise RuntimeError(
-                f"LangFlow GET /api/v1/auto_login failed with HTTP {login.status_code}. "
-                f"Response: {self.response_detail(login)}"
+                "LANGFLOW_API_KEY is missing. Start Phase 1 with ./start.sh --phase1 so the launcher can create it."
             )
-        session.headers["Authorization"] = f"Bearer {login.json()['access_token']}"
+        session = requests.Session()
+        session.headers.update({"x-api-key": langflow_api_key, "Accept": "application/json"})
         self.current_check = "LangFlow registered-flow lookup"
         flows = session.get(f"{self.langflow_url}/api/v1/flows/", timeout=30)
         if not flows.ok:
@@ -311,7 +310,6 @@ class PhaseSmokeTest:
                         "output_type": "chat",
                         "session_id": f"langflow-smoke-{uuid.uuid4()}",
                     },
-                    headers={"Accept": "application/json"},
                     timeout=300,
                 )
                 if run.status_code < 500 or attempt == 1:

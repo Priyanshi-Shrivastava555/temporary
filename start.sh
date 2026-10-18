@@ -343,7 +343,16 @@ fi
 
 if [[ "$needs_langflow" == true ]]; then
     "$langflow_python" -c 'from importlib.metadata import version; print("LangFlow runtime: {} (lfx {})".format(version("langflow"), version("lfx")))'
+    "$langflow_python" "$project_root/scripts/ensure_langflow_api_key.py" --env-file "$project_root/.env"
+    # The evaluator starts after this launcher exits and reads .env itself.
+    # Re-source it here as well so registration and smoke tests exercise the
+    # exact same x-api-key credential during this run.
+    set -a
+    # shellcheck disable=SC1091
+    . "$project_root/.env"
+    set +a
     "$langflow_python" "$project_root/scripts/register_langflow_flow.py"
+    "$langflow_python" "$project_root/scripts/phase1_diagnostics.py" --output "$project_root/phase1_diagnostics.txt"
 fi
 
 echo "$phase" >"$project_root/logs/active-phase"
