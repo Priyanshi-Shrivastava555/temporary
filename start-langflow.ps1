@@ -48,6 +48,7 @@ if ($InstallOnly) {
 $env:LANGFLOW_COMPONENTS_PATH = Join-Path $projectRoot 'langflow\components'
 $env:LANGFLOW_CONFIG_DIR = Join-Path $projectRoot '.langflow-data'
 $env:LANGFLOW_AUTO_LOGIN = 'true'
+$env:LANGFLOW_SKIP_AUTH_AUTO_LOGIN = 'true'
 $env:LANGFLOW_CORS_ORIGINS = 'http://127.0.0.1:7860,http://localhost:7860'
 $env:DO_NOT_TRACK = 'true'
 if (Test-Path (Join-Path $projectRoot '.env')) {

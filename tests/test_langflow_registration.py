@@ -4,6 +4,13 @@ from scripts.register_langflow_flow import _flow_signature, _update_flow
 class FakeResponse:
     def __init__(self, status_code):
         self.status_code = status_code
+        self.ok = status_code < 400
+        self.request = type("Request", (), {"method": "PATCH"})()
+        self.url = "http://langflow.test/api/v1/flows/flow-id"
+        self.text = ""
+
+    def json(self):
+        return {}
 
     def raise_for_status(self):
         if self.status_code >= 400:

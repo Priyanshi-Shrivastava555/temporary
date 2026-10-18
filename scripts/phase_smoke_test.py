@@ -5,7 +5,10 @@ import argparse
 import json
 import os
 from pathlib import Path
+import re
+import sys
 import time
+import traceback
 import uuid
 from typing import Any
 
@@ -28,6 +31,7 @@ class PhaseSmokeTest:
         self.langflow_url = langflow_url.rstrip("/")
         self.session_id = f"{phase}-smoke-{uuid.uuid4()}"
         self.sessions_to_clean = {self.session_id}
+        self.current_check = "initialization"
         self.active_provider = os.getenv("SHOP_BUDDY_ACTIVE_AI_PROVIDER", "").strip().lower()
         if self.active_provider:
             self.has_ai_key = self.active_provider in {"openai", "gemini"}
@@ -36,9 +40,67 @@ class PhaseSmokeTest:
             self.has_ai_key = bool(os.getenv("OPENAI_API_KEY") or os.getenv("GEMINI_API_KEY"))
 
     def request(self, method: str, path: str, **kwargs: Any) -> dict[str, Any]:
-        response = requests.request(method, f"{self.api_url}{path}", timeout=kwargs.pop("timeout", 120), **kwargs)
-        response.raise_for_status()
-        return response.json()
+        url = f"{self.api_url}{path}"
+        self.current_check = f"FastAPI {method.upper()} {path}"
+        try:
+            response = requests.request(method, url, timeout=kwargs.pop("timeout", 120), **kwargs)
+        except requests.RequestException as exc:
+            raise RuntimeError(
+                f"[{self.phase}] {self.current_check} could not connect to {url}: {type(exc).__name__}: {exc}"
+            ) from exc
+        if not response.ok:
+            raise RuntimeError(
+                f"[{self.phase}] {self.current_check} failed with HTTP {response.status_code}. "
+                f"Response: {self.response_detail(response)}"
+            )
+        try:
+            return response.json()
+        except ValueError as exc:
+            raise RuntimeError(
+                f"[{self.phase}] {self.current_check} returned invalid JSON. Response: {response.text[:1500]}"
+            ) from exc
+
+    @staticmethod
+    def response_detail(response: requests.Response) -> str:
+        try:
+            content = json.dumps(response.json(), default=str)
+        except ValueError:
+            content = response.text
+        return " ".join(content.split())[:2000] or "<empty response body>"
+
+    @staticmethod
+    def redact(text: str) -> str:
+        for name in ("OPENAI_API_KEY", "GEMINI_API_KEY", "ODOO_ADMIN_PASSWORD"):
+            secret = os.getenv(name, "")
+            if secret:
+                text = text.replace(secret, f"<{name}:redacted>")
+        text = re.sub(r"(?i)(authorization[^\n:]*:\s*bearer\s+)[^\s]+", r"\1<redacted>", text)
+        text = re.sub(r"(?i)(api[_-]?key[\"'=:\s]+)[A-Za-z0-9._-]{8,}", r"\1<redacted>", text)
+        return text
+
+    def failure_report(self, exc: BaseException) -> None:
+        print("\n" + "=" * 78, file=sys.stderr)
+        print(f"SHOP BUDDY SMOKE FAILURE [{self.phase}]", file=sys.stderr)
+        print(f"Check: {self.current_check}", file=sys.stderr)
+        print(f"Error: {type(exc).__name__}: {self.redact(str(exc))}", file=sys.stderr)
+        print("Traceback:", file=sys.stderr)
+        print(self.redact(traceback.format_exc()).rstrip(), file=sys.stderr)
+        log_names = ["api-error.log", "api.log"]
+        if self.phase == "phase1":
+            log_names = ["langflow-error.log", "langflow.log", *log_names]
+        logs_dir = Path.cwd() / "logs"
+        for name in log_names:
+            path = logs_dir / name
+            if not path.exists():
+                continue
+            try:
+                lines = path.read_text(encoding="utf-8", errors="replace").splitlines()[-60:]
+            except OSError as log_error:
+                print(f"\n--- {path} could not be read: {log_error} ---", file=sys.stderr)
+                continue
+            print(f"\n--- last {len(lines)} lines: {path} ---", file=sys.stderr)
+            print(self.redact("\n".join(lines)) or "<log is empty>", file=sys.stderr)
+        print("=" * 78, file=sys.stderr)
 
     def chat(self, message: str, session_id: str | None = None) -> dict[str, Any]:
         active_session = session_id or self.session_id
@@ -74,6 +136,7 @@ class PhaseSmokeTest:
 
     def verify_framework_structure(self) -> None:
         """Build phase runtimes without a network call and verify evaluator-visible structure."""
+        self.current_check = f"{self.phase} framework structure"
         from shop_buddy.settings import Settings
 
         runtime_data = Path.cwd() / ".runtime-data"
@@ -168,17 +231,28 @@ class PhaseSmokeTest:
         print("PASS [phase4]: multi-turn selected-product memory")
 
     def verify_langflow(self) -> None:
+        self.current_check = "LangFlow authentication"
         session = requests.Session()
         login = session.get(f"{self.langflow_url}/api/v1/auto_login", timeout=30)
-        login.raise_for_status()
+        if not login.ok:
+            raise RuntimeError(
+                f"LangFlow GET /api/v1/auto_login failed with HTTP {login.status_code}. "
+                f"Response: {self.response_detail(login)}"
+            )
         session.headers["Authorization"] = f"Bearer {login.json()['access_token']}"
+        self.current_check = "LangFlow registered-flow lookup"
         flows = session.get(f"{self.langflow_url}/api/v1/flows/", timeout=30)
-        flows.raise_for_status()
+        if not flows.ok:
+            raise RuntimeError(
+                f"LangFlow GET /api/v1/flows/ failed with HTTP {flows.status_code}. "
+                f"Response: {self.response_detail(flows)}"
+            )
         flow = next(item for item in flows.json() if item.get("name") == "Shop Buddy")
         assert len(flow["data"]["nodes"]) == 11 and len(flow["data"]["edges"]) == 12
         print("PASS [phase1]: LangFlow Shop Buddy flow is registered with 11 nodes and 12 edges")
 
         if self.has_ai_key:
+            self.current_check = f"LangFlow live Shop Buddy execution ({self.active_provider or 'configured provider'})"
             run = None
             for attempt in range(2):
                 run = session.post(
@@ -196,11 +270,7 @@ class PhaseSmokeTest:
                 time.sleep(2)
             assert run is not None
             if not run.ok:
-                try:
-                    detail = json.dumps(run.json(), default=str)
-                except ValueError:
-                    detail = run.text
-                detail = " ".join(detail.split())[:1500] or "LangFlow returned no error details."
+                detail = self.response_detail(run)
                 provider = self.active_provider or "configured provider"
                 raise RuntimeError(
                     f"LangFlow Shop Buddy execution failed with HTTP {run.status_code} using {provider}: {detail}. "
@@ -218,10 +288,11 @@ class PhaseSmokeTest:
                     self.request("DELETE", "/delete_product_from_cart/", json={
                         "product_id": item["product_id"], "session_id": session_id,
                     })
-            except requests.RequestException:
+            except (requests.RequestException, RuntimeError):
                 pass
 
     def run(self) -> None:
+        self.current_check = "FastAPI health and workflow mode"
         health = self.request("GET", "/health")
         assert health["status"] == "ok"
         assert health["workflow"] == WORKFLOW_BY_PHASE[self.phase], health
@@ -247,7 +318,12 @@ def main() -> int:
     parser.add_argument("--api-url", default="http://127.0.0.1:8000")
     parser.add_argument("--langflow-url", default="http://127.0.0.1:7860")
     args = parser.parse_args()
-    PhaseSmokeTest(args.phase, args.api_url, args.langflow_url).run()
+    smoke = PhaseSmokeTest(args.phase, args.api_url, args.langflow_url)
+    try:
+        smoke.run()
+    except Exception as exc:
+        smoke.failure_report(exc)
+        return 1
     return 0
 
 
