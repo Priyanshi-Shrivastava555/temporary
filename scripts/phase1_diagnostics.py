@@ -14,6 +14,7 @@ import sys
 from typing import Any
 
 import requests
+from dotenv import dotenv_values
 
 from listening_pids import listening_pids
 
@@ -60,7 +61,7 @@ def response_summary(response: requests.Response) -> str:
     return f"HTTP {response.status_code}; content-type={content_type}; final-url={response.url}"
 
 
-def write_report(output: Path) -> tuple[list[str], list[str]]:
+def write_report(output: Path, env_file: Path) -> tuple[list[str], list[str]]:
     lines = [
         "Shop Buddy Phase 1 diagnostic report",
         f"generated_utc={datetime.now(timezone.utc).isoformat()}",
@@ -69,6 +70,7 @@ def write_report(output: Path) -> tuple[list[str], list[str]]:
         f"langflow_package={package_version('langflow')}",
         f"lfx_package={package_version('lfx')}",
         f"langflow_url={LANGFLOW_URL}",
+        f"env_file={env_file.resolve()}",
     ]
     failures: list[str] = []
 
@@ -83,12 +85,19 @@ def write_report(output: Path) -> tuple[list[str], list[str]]:
         value = os.getenv(name, "").strip()
         lines.append(f"env_{name}=configured" if value else f"env_{name}=missing")
 
-    api_key = os.getenv("LANGFLOW_API_KEY", "").strip()
+    persisted_values = dotenv_values(env_file)
+    persisted_api_key = str(persisted_values.get("LANGFLOW_API_KEY") or "").strip()
+    inherited_api_key = os.getenv("LANGFLOW_API_KEY", "").strip()
+    lines.append(f"persisted_LANGFLOW_API_KEY={'configured' if persisted_api_key else 'missing'}")
+    lines.append(f"persisted_key_matches_process={'yes' if persisted_api_key == inherited_api_key else 'no'}")
+    api_key = persisted_api_key
     if api_key:
         fingerprint = hashlib.sha256(api_key.encode()).hexdigest()[:12]
-        lines.append(f"langflow_api_key_fingerprint_sha256={fingerprint}")
+        lines.append(f"persisted_langflow_api_key_fingerprint_sha256={fingerprint}")
     else:
-        failures.append("LANGFLOW_API_KEY is missing from the environment loaded from .env.")
+        failures.append("LANGFLOW_API_KEY is missing from the persisted .env file.")
+    if persisted_api_key != inherited_api_key:
+        failures.append("The persisted LANGFLOW_API_KEY does not match the launcher process environment.")
 
     session = requests.Session()
     session.headers.update({"x-api-key": api_key, "Accept": "application/json"})
@@ -153,8 +162,9 @@ def write_report(output: Path) -> tuple[list[str], list[str]]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--env-file", type=Path, required=True)
     args = parser.parse_args()
-    _lines, failures = write_report(args.output)
+    _lines, failures = write_report(args.output, args.env_file)
     print(f"Phase 1 diagnostic report written to {args.output}")
     if failures:
         print(f"Phase 1 diagnostic readiness failed with {len(failures)} issue(s).", file=sys.stderr)

@@ -352,13 +352,18 @@ if [[ "$needs_langflow" == true ]]; then
     . "$project_root/.env"
     set +a
     "$langflow_python" "$project_root/scripts/register_langflow_flow.py"
-    "$langflow_python" "$project_root/scripts/phase1_diagnostics.py" --output "$project_root/phase1_diagnostics.txt"
+    "$langflow_python" "$project_root/scripts/phase1_diagnostics.py" \
+        --env-file "$project_root/.env" \
+        --output "$project_root/phase1_diagnostics.txt"
 fi
 
 echo "$phase" >"$project_root/logs/active-phase"
 
 if [[ "$run_smoke" == true ]]; then
     "$venv_python" "$project_root/scripts/phase_smoke_test.py" --phase "$phase"
+    if [[ "$phase" == "phase1" ]]; then
+        echo "phase1_smoke=PASS" >> "$project_root/phase1_diagnostics.txt"
+    fi
 fi
 
 echo
