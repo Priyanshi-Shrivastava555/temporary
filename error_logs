@@ -1,12 +1,18 @@
-ubuntu@ip-172-31-19-157:~/Desktop/The Smart Shopping Demo/temporary$ ./start.sh --phase1 --no-install
+up to date, audited 20 packages in 1s
+
+8 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+LangFlow 1.12.5 is already installed.
 Validating configured AI provider...
 AI provider ready: openai (model gpt-4o-mini accepted a chat request).
 INFO: Odoo credentials are incomplete; the approved SQLite implementation will be used.
 Starting FastAPI in langgraph mode...
 Starting React frontend...
 LangFlow runtime: 1.12.5 (lfx 1.12.5)
-Archived duplicate LangFlow flow: Shop_Buddy_legacy_43d4e31f (43d4e31f-94c8-4d2f-96f1-2d9a50b3986d)
-LangFlow flow created: Shop_Buddy (9a6abf41-713f-47b7-a019-88d19174e411)
+Archived duplicate LangFlow flow: Shop_Buddy_legacy_9a6abf41 (9a6abf41-713f-47b7-a019-88d19174e411)
+LangFlow flow created: Shop_Buddy (b5985588-af57-4ba2-83bd-661dd0155f0f)
 PASS [phase1]: Show me office chairs. -> search
 PASS [phase1]: Find an office chair under $500 and add it to my cart. -> combined
 PASS [phase1]: Add 2 conference chairs to my cart. -> combined
@@ -18,35 +24,54 @@ PASS [phase1]: LangFlow Shop_Buddy flow is registered with 11 nodes and 12 edges
 ==============================================================================
 SHOP BUDDY SMOKE FAILURE [phase1]
 Check: LangFlow live Shop Buddy execution (openai)
-Error: RuntimeError: LangFlow Shop_Buddy execution failed with HTTP 500 using openai: {"detail": "{\"message\":\"Field model in Orchestration Agent is not a valid field type: model\",\"traceback\":null,\"description\":null,\"code\":null,\"suggestion\":null}"}. The services remain running; inspect logs/langflow-error.log for the component traceback.
+Error: JSONDecodeError: Expecting value: line 1 column 1 (char 0)
 Traceback:
 Traceback (most recent call last):
-  File "/home/ubuntu/Desktop/The Smart Shopping Demo/temporary/scripts/phase_smoke_test.py", line 343, in main
+  File "/home/ubuntu/Desktop/The Smart Shopping Demo/temporary/.venv/lib/python3.12/site-packages/requests/models.py", line 1116, in json
+    return complexjson.loads(self.text, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/ubuntu/Desktop/The Smart Shopping Demo/temporary/scripts/phase_smoke_test.py", line 351, in main
     smoke.run()
-  File "/home/ubuntu/Desktop/The Smart Shopping Demo/temporary/scripts/phase_smoke_test.py", line 321, in run
+  File "/home/ubuntu/Desktop/The Smart Shopping Demo/temporary/scripts/phase_smoke_test.py", line 329, in run
     self.run_phase1_or_5()
-  File "/home/ubuntu/Desktop/The Smart Shopping Demo/temporary/scripts/phase_smoke_test.py", line 202, in run_phase1_or_5
+  File "/home/ubuntu/Desktop/The Smart Shopping Demo/temporary/scripts/phase_smoke_test.py", line 210, in run_phase1_or_5
     self.verify_langflow()
-  File "/home/ubuntu/Desktop/The Smart Shopping Demo/temporary/scripts/phase_smoke_test.py", line 293, in verify_langflow
-    raise RuntimeError(
-RuntimeError: LangFlow Shop_Buddy execution failed with HTTP 500 using openai: {"detail": "{\"message\":\"Field model in Orchestration Agent is not a valid field type: model\",\"traceback\":null,\"description\":null,\"code\":null,\"suggestion\":null}"}. The services remain running; inspect logs/langflow-error.log for the component traceback.
+  File "/home/ubuntu/Desktop/The Smart Shopping Demo/temporary/scripts/phase_smoke_test.py", line 305, in verify_langflow
+    assert run.json(), "LangFlow returned an empty execution result."
+           ^^^^^^^^^^
+  File "/home/ubuntu/Desktop/The Smart Shopping Demo/temporary/.venv/lib/python3.12/site-packages/requests/models.py", line 1120, in json
+    raise RequestsJSONDecodeError(e.msg, e.doc, e.pos)
+requests.exceptions.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
 
 --- last 4 lines: /home/ubuntu/Desktop/The Smart Shopping Demo/temporary/logs/api-error.log ---
-INFO:     Started server process [15792]
+INFO:     Started server process [18757]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
 
 --- last 10 lines: /home/ubuntu/Desktop/The Smart Shopping Demo/temporary/logs/api.log ---
-INFO:     127.0.0.1:59802 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:59812 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:59818 - "POST /chat HTTP/1.1" 200 OK
-INFO:     127.0.0.1:48338 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46272 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46288 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46300 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46312 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48348 - "POST /chat HTTP/1.1" 200 OK
 INFO:     127.0.0.1:48350 - "POST /chat HTTP/1.1" 200 OK
-INFO:     127.0.0.1:48356 - "POST /chat HTTP/1.1" 200 OK
-INFO:     127.0.0.1:48362 - "POST /chat HTTP/1.1" 200 OK
-INFO:     127.0.0.1:48370 - "POST /chat HTTP/1.1" 200 OK
-INFO:     127.0.0.1:51014 - "GET /get_cart_items/?session_id=phase1-smoke-74e7c540-092e-438f-a5af-b260a6e80109 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:51028 - "DELETE /delete_product_from_cart/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48366 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48374 - "POST /chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48384 - "GET /get_cart_items/?session_id=phase1-smoke-198ab242-5a06-4586-afa8-efb7c2aac5a3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48394 - "DELETE /delete_product_from_cart/ HTTP/1.1" 200 OK
 ==============================================================================
 ubuntu@ip-172-31-19-157:~/Desktop/The Smart Shopping Demo/temporary$ 
