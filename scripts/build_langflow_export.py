@@ -40,7 +40,7 @@ FLOW_ID = "a9d23675-97bd-4c72-8a32-9d8815fab311"
 FLOW_NAME = "Shop_Buddy"
 FLOW_DESCRIPTION = (
     "UrbanNest agentic shopping flow with orchestration, search, cart management, "
-    "and five FastAPI tools. Registration schema v2."
+    "and five FastAPI tools. Registration schema v3."
 )
 SIMPLE_AGENT_ID = "f05ffa00-25ed-4be6-9922-6d7bfa0c83ed"
 SEPARATOR = "œ"
@@ -190,6 +190,23 @@ def synchronize_local_model(flow: dict) -> dict:
         # is connected to a ModelInput. It keeps the saved canvas and runtime
         # interpretation aligned across supported LangFlow installations.
         agent["data"]["_connectionMode"] = True
+        model_field = agent["data"]["node"]["template"]["model"]
+        # Some LangFlow 1.12.5 distributions do not include ``model`` in
+        # ParameterHandler.DIRECT_TYPES even though ModelInput serializes with
+        # that field type. Connected inputs are represented as ``other`` by
+        # older-compatible canvases; the incoming LanguageModel edge still
+        # supplies the actual runtime value. This avoids failing before edges
+        # are merged with "not a valid field type: model".
+        model_field["type"] = "other"
+        model_field["value"] = ""
+
+    for edge in flow["data"]["edges"]:
+        target = (edge.get("data") or {}).get("targetHandle") or {}
+        if target.get("fieldName") == "model":
+            target["type"] = "other"
+            raw_target = edge.get("targetHandle")
+            if isinstance(raw_target, str):
+                edge["targetHandle"] = raw_target.replace("œtypeœ: œmodelœ", "œtypeœ: œotherœ")
     return flow
 
 
@@ -256,6 +273,8 @@ def build_flow() -> dict:
     }
     for node in (orchestrator, search_agent, cart_agent):
         node["data"]["_connectionMode"] = True
+        node["data"]["node"]["template"]["model"]["type"] = "other"
+        node["data"]["node"]["template"]["model"]["value"] = ""
         node["data"]["node"]["template"]["system_prompt"]["value"] = prompts[node["id"]]
         node["data"]["node"]["template"]["add_current_date_tool"]["value"] = False
         node["data"]["node"]["template"]["add_calculator_tool"]["value"] = False
@@ -282,7 +301,7 @@ def build_flow() -> dict:
         edges.append(
             _edge(
                 "ShopBuddyModel-shopbuddy", target, model_cache_key, "model", ["LanguageModel"],
-                "model", ["LanguageModel"], "model",
+                "model", ["LanguageModel"], "other",
             )
         )
     for cache_key, node_id, _x, _y, target in tool_specs:

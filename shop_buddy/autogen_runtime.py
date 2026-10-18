@@ -1,6 +1,7 @@
 """AutoGen 0.2 autonomous phase with registered FastAPI tools."""
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import autogen
@@ -20,24 +21,55 @@ def search_products(query: str, max_price: float | None = None) -> dict[str, Any
     return api_search_products(query, max_price)
 
 
-def get_cart(session_id: str = "default") -> dict[str, Any]:
+def get_cart(session_id: str) -> dict[str, Any]:
     """Retrieve a shopper's cart through FastAPI."""
     return get_cart_items(session_id)
 
 
-def add_to_cart(product_id: int, quantity: int = 1, session_id: str = "default") -> dict[str, Any]:
-    """Add a product to a shopper's cart through FastAPI."""
-    return add_product_to_cart(product_id, quantity, session_id)
+def _tokens(value: str) -> set[str]:
+    return {
+        token[:-1] if token.endswith("s") and len(token) > 3 else token
+        for token in re.findall(r"[a-z0-9]+", value.lower())
+    }
 
 
-def update_cart(product_id: int, quantity: int, session_id: str = "default") -> dict[str, Any]:
-    """Update a cart product quantity through FastAPI."""
-    return update_cart_item(product_id, quantity, session_id)
+def _catalog_product(product_name: str) -> dict[str, Any]:
+    products = api_search_products(product_name).get("products", [])
+    if not products:
+        raise LookupError(f"No catalogue product matched {product_name!r}.")
+    wanted = _tokens(product_name)
+    return max(products, key=lambda product: len(wanted & _tokens(str(product.get("title", "")))))
 
 
-def delete_from_cart(product_id: int, session_id: str = "default") -> dict[str, Any]:
-    """Delete a product from a shopper's cart through FastAPI."""
-    return delete_cart_item(product_id, session_id)
+def _cart_product(product_name: str, session_id: str) -> dict[str, Any]:
+    items = get_cart_items(session_id).get("items", [])
+    wanted = _tokens(product_name)
+    ranked = sorted(
+        ((len(wanted & _tokens(str(item.get("title", "")))), item) for item in items),
+        key=lambda match: match[0],
+        reverse=True,
+    )
+    if not ranked or ranked[0][0] == 0:
+        raise LookupError(f"No cart item matched {product_name!r}.")
+    return ranked[0][1]
+
+
+def add_to_cart(product_name: str, quantity: int, session_id: str) -> dict[str, Any]:
+    """Resolve a named catalogue product and add it through FastAPI."""
+    product = _catalog_product(product_name)
+    return add_product_to_cart(int(product["id"]), quantity, session_id)
+
+
+def update_cart(product_name: str, quantity: int, session_id: str) -> dict[str, Any]:
+    """Resolve a named cart item and update it through FastAPI."""
+    product = _cart_product(product_name, session_id)
+    return update_cart_item(int(product["product_id"]), quantity, session_id)
+
+
+def delete_from_cart(product_name: str, session_id: str) -> dict[str, Any]:
+    """Resolve a named cart item and delete it through FastAPI."""
+    product = _cart_product(product_name, session_id)
+    return delete_cart_item(int(product["product_id"]), session_id)
 
 
 def _llm_config(settings: Settings) -> dict[str, Any] | None:
@@ -101,7 +133,11 @@ class AutoGenRuntime:
         self.cart_agent = autogen.AssistantAgent(
             name="cart_management_agent",
             description="Adds, retrieves, updates, and deletes UrbanNest cart items.",
-            system_message="Use the registered cart tools and report only confirmed cart operations.",
+            system_message=(
+                "Use the registered cart tools and report only confirmed operations. Cart tools accept the product "
+                "name from the shopper, resolve backend product IDs themselves, and require the exact shopper "
+                "session_id shown in the request. Never guess a numeric product ID and never use a default session."
+            ),
             llm_config=self.llm_config,
         )
         self.user_proxy = autogen.UserProxyAgent(
@@ -122,9 +158,9 @@ class AutoGenRuntime:
         )
         for function, name, description in (
             (get_cart, "get_cart", "Retrieve the current shopping cart."),
-            (add_to_cart, "add_to_cart", "Add a product and quantity to the cart."),
-            (update_cart, "update_cart", "Set an existing cart product quantity."),
-            (delete_from_cart, "delete_from_cart", "Remove a product from the cart."),
+            (add_to_cart, "add_to_cart", "Resolve a product name and add its requested quantity to the shopper cart."),
+            (update_cart, "update_cart", "Resolve a cart item name and set its quantity."),
+            (delete_from_cart, "delete_from_cart", "Resolve a cart item name and remove it from the shopper cart."),
         ):
             autogen.register_function(
                 function,

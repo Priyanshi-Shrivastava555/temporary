@@ -15,6 +15,14 @@ from typing import Any
 import requests
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    # Direct execution (``python scripts/phase_smoke_test.py``) otherwise puts
+    # only the scripts directory on sys.path on some Python/OS combinations.
+    # Phase 2/3 structure checks import the local package explicitly.
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+
 WORKFLOW_BY_PHASE = {
     "phase1": "langgraph",
     "phase2": "crewai",

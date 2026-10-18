@@ -9,7 +9,7 @@ import json
 import os
 import sys
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 import requests
 
@@ -75,6 +75,14 @@ def _probe_openai() -> tuple[bool, str]:
         return False, f"network failure ({type(exc).__name__})"
     if response.ok:
         return True, f"model {model} accepted a chat request"
+    if response.status_code in {401, 403}:
+        host = urlparse(base_url).netloc or base_url
+        if host.lower() == "api.openai.com":
+            return False, f"HTTP {response.status_code}: OPENAI_API_KEY was rejected by OpenAI"
+        return False, (
+            f"HTTP {response.status_code}: OPENAI_API_KEY was rejected by configured proxy {host}; "
+            "use a token issued for that proxy, or use https://api.openai.com/v1 with an OpenAI-issued key"
+        )
     return False, f"HTTP {response.status_code}: {_error_text(response)}"
 
 

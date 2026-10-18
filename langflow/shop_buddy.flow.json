@@ -1,7 +1,7 @@
 {
   "id": "a9d23675-97bd-4c72-8a32-9d8815fab311",
   "name": "Shop_Buddy",
-  "description": "UrbanNest agentic shopping flow with orchestration, search, cart management, and five FastAPI tools. Registration schema v2.",
+  "description": "UrbanNest agentic shopping flow with orchestration, search, cart management, and five FastAPI tools. Registration schema v3.",
   "endpoint_name": "shop-buddy",
   "is_component": false,
   "data": {
@@ -972,7 +972,7 @@
                 "tool_mode": false,
                 "trace_as_input": true,
                 "track_in_telemetry": false,
-                "type": "model",
+                "type": "other",
                 "value": ""
               },
               "n_messages": {
@@ -1596,7 +1596,7 @@
                 "tool_mode": false,
                 "trace_as_input": true,
                 "track_in_telemetry": false,
-                "type": "model",
+                "type": "other",
                 "value": ""
               },
               "n_messages": {
@@ -2220,7 +2220,7 @@
                 "tool_mode": false,
                 "trace_as_input": true,
                 "track_in_telemetry": false,
-                "type": "model",
+                "type": "other",
                 "value": ""
               },
               "n_messages": {
@@ -3765,7 +3765,7 @@
         "source": "ShopBuddyModel-shopbuddy",
         "target": "Agent-orchestrator",
         "sourceHandle": "{œdataTypeœ: œext:shop_buddy:ShopBuddyModelComponent@extraœ, œidœ: œShopBuddyModel-shopbuddyœ, œnameœ: œmodelœ, œoutput_typesœ: [œLanguageModelœ]}",
-        "targetHandle": "{œfieldNameœ: œmodelœ, œidœ: œAgent-orchestratorœ, œinputTypesœ: [œLanguageModelœ], œtypeœ: œmodelœ}",
+        "targetHandle": "{œfieldNameœ: œmodelœ, œidœ: œAgent-orchestratorœ, œinputTypesœ: [œLanguageModelœ], œtypeœ: œotherœ}",
         "data": {
           "sourceHandle": {
             "dataType": "ext:shop_buddy:ShopBuddyModelComponent@extra",
@@ -3781,7 +3781,7 @@
             "inputTypes": [
               "LanguageModel"
             ],
-            "type": "model"
+            "type": "other"
           }
         },
         "animated": false,
@@ -3793,7 +3793,7 @@
         "source": "ShopBuddyModel-shopbuddy",
         "target": "Agent-search",
         "sourceHandle": "{œdataTypeœ: œext:shop_buddy:ShopBuddyModelComponent@extraœ, œidœ: œShopBuddyModel-shopbuddyœ, œnameœ: œmodelœ, œoutput_typesœ: [œLanguageModelœ]}",
-        "targetHandle": "{œfieldNameœ: œmodelœ, œidœ: œAgent-searchœ, œinputTypesœ: [œLanguageModelœ], œtypeœ: œmodelœ}",
+        "targetHandle": "{œfieldNameœ: œmodelœ, œidœ: œAgent-searchœ, œinputTypesœ: [œLanguageModelœ], œtypeœ: œotherœ}",
         "data": {
           "sourceHandle": {
             "dataType": "ext:shop_buddy:ShopBuddyModelComponent@extra",
@@ -3809,7 +3809,7 @@
             "inputTypes": [
               "LanguageModel"
             ],
-            "type": "model"
+            "type": "other"
           }
         },
         "animated": false,
@@ -3821,7 +3821,7 @@
         "source": "ShopBuddyModel-shopbuddy",
         "target": "Agent-cart",
         "sourceHandle": "{œdataTypeœ: œext:shop_buddy:ShopBuddyModelComponent@extraœ, œidœ: œShopBuddyModel-shopbuddyœ, œnameœ: œmodelœ, œoutput_typesœ: [œLanguageModelœ]}",
-        "targetHandle": "{œfieldNameœ: œmodelœ, œidœ: œAgent-cartœ, œinputTypesœ: [œLanguageModelœ], œtypeœ: œmodelœ}",
+        "targetHandle": "{œfieldNameœ: œmodelœ, œidœ: œAgent-cartœ, œinputTypesœ: [œLanguageModelœ], œtypeœ: œotherœ}",
         "data": {
           "sourceHandle": {
             "dataType": "ext:shop_buddy:ShopBuddyModelComponent@extra",
@@ -3837,7 +3837,7 @@
             "inputTypes": [
               "LanguageModel"
             ],
-            "type": "model"
+            "type": "other"
           }
         },
         "animated": false,

@@ -112,10 +112,17 @@ def test_export_uses_evaluator_name_and_external_model_mode():
 
     assert flow["name"] == "Shop_Buddy"
     assert flow["endpoint_name"] == "shop-buddy"
-    assert flow["description"].endswith("Registration schema v2.")
+    assert flow["description"].endswith("Registration schema v3.")
     agents = [node for node in flow["data"]["nodes"] if node["data"]["type"] == "Agent"]
     assert len(agents) == 3
     assert all(agent["data"].get("_connectionMode") is True for agent in agents)
+    assert all(agent["data"]["node"]["template"]["model"]["type"] == "other" for agent in agents)
+    model_edges = [
+        edge for edge in flow["data"]["edges"]
+        if edge["data"]["targetHandle"].get("fieldName") == "model"
+    ]
+    assert len(model_edges) == 3
+    assert all(edge["data"]["targetHandle"]["type"] == "other" for edge in model_edges)
     model_edges = [
         edge for edge in flow["data"]["edges"]
         if edge["data"]["targetHandle"].get("fieldName") == "model"

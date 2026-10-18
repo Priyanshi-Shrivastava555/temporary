@@ -1,7 +1,18 @@
 """CrewAI collaborative phase with real agents, tasks, and HTTP tools."""
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from typing import Any
+
+# CrewAI resolves and creates its task/RAG storage directory while the package
+# is imported. Keep that state inside the project so restricted Windows VDIs
+# and Linux evaluators do not depend on a writable user-profile directory.
+_storage_setting = Path(os.getenv("CREWAI_STORAGE_DIR", "crewai"))
+if not _storage_setting.is_absolute():
+    _storage_setting = Path(__file__).resolve().parents[1] / ".runtime-data" / _storage_setting
+_storage_setting.mkdir(parents=True, exist_ok=True)
+os.environ["CREWAI_STORAGE_DIR"] = str(_storage_setting)
 
 from crewai import Agent, Crew, LLM, Process, Task
 from crewai.tools import tool
