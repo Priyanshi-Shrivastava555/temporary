@@ -76,6 +76,27 @@ class PhaseSmokeTest:
             content = response.text
         return " ".join(content.split())[:2000] or "<empty response body>"
 
+    @classmethod
+    def require_json_response(cls, response: requests.Response, operation: str) -> dict[str, Any]:
+        """Return a non-empty JSON object or raise with transport-level diagnostics."""
+        content_type = response.headers.get("content-type", "<missing>")
+        content_length = response.headers.get("content-length", "<missing>")
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise RuntimeError(
+                f"{operation} returned HTTP {response.status_code} but not JSON "
+                f"(content-type={content_type!r}, content-length={content_length!r}). "
+                f"Response: {cls.response_detail(response)}"
+            ) from exc
+        if not isinstance(payload, dict) or not payload:
+            raise RuntimeError(
+                f"{operation} returned HTTP {response.status_code} without a non-empty JSON object "
+                f"(content-type={content_type!r}, content-length={content_length!r}). "
+                f"Response: {cls.response_detail(response)}"
+            )
+        return payload
+
     @staticmethod
     def redact(text: str) -> str:
         for name in ("OPENAI_API_KEY", "GEMINI_API_KEY", "ODOO_ADMIN_PASSWORD"):
@@ -279,16 +300,18 @@ class PhaseSmokeTest:
             run = None
             for attempt in range(2):
                 run = session.post(
-                    # Execute the exact evaluator-selected flow UUID. The
-                    # registrar separately guarantees that this same flow is
-                    # the sole owner of the friendly shop-buddy endpoint.
-                    f"{self.langflow_url}/api/v1/run/{flow['id']}",
-                    json={"input_request": {
+                    # Exercise the same stable endpoint the evaluator uses.
+                    # SimplifiedAPIRequest fields belong at the JSON root in
+                    # LangFlow 1.12; wrapping them in ``input_request`` causes
+                    # LangFlow to silently discard the prompt and session ID.
+                    f"{self.langflow_url}/api/v1/run/shop-buddy",
+                    json={
                         "input_value": "Show me office chairs.",
                         "input_type": "chat",
                         "output_type": "chat",
                         "session_id": f"langflow-smoke-{uuid.uuid4()}",
-                    }},
+                    },
+                    headers={"Accept": "application/json"},
                     timeout=300,
                 )
                 if run.status_code < 500 or attempt == 1:
@@ -302,7 +325,12 @@ class PhaseSmokeTest:
                     f"LangFlow Shop_Buddy execution failed with HTTP {run.status_code} using {provider}: {detail}. "
                     "The services remain running; inspect logs/langflow-error.log for the component traceback."
                 )
-            assert run.json(), "LangFlow returned an empty execution result."
+            result = self.require_json_response(run, "LangFlow Shop_Buddy execution")
+            if not isinstance(result.get("outputs"), list):
+                raise RuntimeError(
+                    "LangFlow Shop_Buddy execution returned JSON without the expected 'outputs' list. "
+                    f"Response: {self.response_detail(run)}"
+                )
             print(f"PASS [phase1]: live LangFlow AI execution using {self.active_provider or 'configured provider'}")
         else:
             print("SKIP [phase1]: live LangFlow AI execution requires OPENAI_API_KEY or GEMINI_API_KEY")
