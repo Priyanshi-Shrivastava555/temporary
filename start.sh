@@ -220,6 +220,7 @@ stop_stale_project_listener() {
     local service_name="$1"
     local port="$2"
     local required_command_text="$3"
+    local allow_external_service="${4:-false}"
     port_open "$port" || return 0
 
     local listener_ids=()
@@ -233,8 +234,13 @@ stop_stale_project_listener() {
     for process_id in "${listener_ids[@]}"; do
         process_cwd="$(readlink -f "/proc/$process_id/cwd" 2>/dev/null || true)"
         process_command="$(tr '\0' ' ' < "/proc/$process_id/cmdline" 2>/dev/null || true)"
-        if [[ "$process_cwd" != "$project_root"* || "$process_command" != *"$required_command_text"* ]]; then
+        if [[ "$process_command" != *"$required_command_text"* ]]; then
             echo "Refusing to stop PID $process_id on port $port because it is not this project's $service_name service." >&2
+            echo "Command: ${process_command:-<unavailable>}" >&2
+            exit 1
+        fi
+        if [[ "$process_cwd" != "$project_root"* && "$allow_external_service" != true ]]; then
+            echo "Refusing to stop PID $process_id on port $port because it is outside this project." >&2
             echo "Command: ${process_command:-<unavailable>}" >&2
             exit 1
         fi
@@ -242,15 +248,20 @@ stop_stale_project_listener() {
 
     for process_id in "${listener_ids[@]}"; do
         kill -0 "$process_id" 2>/dev/null || continue
+        process_cwd="$(readlink -f "/proc/$process_id/cwd" 2>/dev/null || true)"
         process_group="$(ps -o pgid= -p "$process_id" 2>/dev/null | tr -cd '0-9')"
-        echo "Stopping stale $service_name listener on port $port (PID $process_id)..."
+        if [[ "$process_cwd" == "$project_root"* ]]; then
+            echo "Stopping stale $service_name listener on port $port (PID $process_id)..."
+        else
+            echo "Stopping conflicting VDI $service_name listener on port $port (PID $process_id)..."
+        fi
         group_cwd=""
         group_command=""
         if [[ -n "$process_group" ]]; then
             group_cwd="$(readlink -f "/proc/$process_group/cwd" 2>/dev/null || true)"
             group_command="$(tr '\0' ' ' < "/proc/$process_group/cmdline" 2>/dev/null || true)"
         fi
-        if [[ -n "$process_group" && "$group_cwd" == "$project_root"* && "$group_command" == *"$required_command_text"* ]]; then
+        if [[ "$process_cwd" == "$project_root"* && -n "$process_group" && "$group_cwd" == "$project_root"* && "$group_command" == *"$required_command_text"* ]]; then
             kill -TERM -- "-$process_group" 2>/dev/null || kill -TERM "$process_id" 2>/dev/null || true
         else
             kill -TERM "$process_id" 2>/dev/null || true
@@ -274,7 +285,10 @@ if [[ "$phase_requested" == true ]]; then
         stop_stale_project_listener frontend 5173 "vite"
     fi
     if [[ "$needs_langflow" == true ]]; then
-        stop_stale_project_listener langflow 7860 "langflow"
+        # Assessment VDIs may prelaunch a global /Software/langenv LangFlow.
+        # It must yield the evaluator's fixed port to this project's pinned
+        # runtime, but no other external command is eligible for termination.
+        stop_stale_project_listener langflow 7860 "langflow run" true
     fi
 fi
 
