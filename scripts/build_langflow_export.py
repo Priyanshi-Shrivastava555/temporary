@@ -38,6 +38,10 @@ def _local_model_component() -> dict:
 LANGFLOW_URL = "http://127.0.0.1:7860"
 FLOW_ID = "a9d23675-97bd-4c72-8a32-9d8815fab311"
 FLOW_NAME = "Shop_Buddy"
+FLOW_DESCRIPTION = (
+    "UrbanNest agentic shopping flow with orchestration, search, cart management, "
+    "and five FastAPI tools. Registration schema v2."
+)
 SIMPLE_AGENT_ID = "f05ffa00-25ed-4be6-9922-6d7bfa0c83ed"
 SEPARATOR = "œ"
 
@@ -170,6 +174,7 @@ def _component_node(
 def synchronize_local_model(flow: dict) -> dict:
     """Refresh evaluator identity and embedded model without a running server."""
     flow["name"] = FLOW_NAME
+    flow["description"] = FLOW_DESCRIPTION
     component = _local_model_component()
     node = next(
         item
@@ -286,7 +291,7 @@ def build_flow() -> dict:
     return {
         "id": FLOW_ID,
         "name": FLOW_NAME,
-        "description": "UrbanNest agentic shopping flow with orchestration, search, cart management, and five FastAPI tools.",
+        "description": FLOW_DESCRIPTION,
         "endpoint_name": "shop-buddy",
         "is_component": False,
         "data": {

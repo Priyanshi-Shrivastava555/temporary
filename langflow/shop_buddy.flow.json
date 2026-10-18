@@ -1,7 +1,7 @@
 {
   "id": "a9d23675-97bd-4c72-8a32-9d8815fab311",
   "name": "Shop_Buddy",
-  "description": "UrbanNest agentic shopping flow with orchestration, search, cart management, and five FastAPI tools.",
+  "description": "UrbanNest agentic shopping flow with orchestration, search, cart management, and five FastAPI tools. Registration schema v2.",
   "endpoint_name": "shop-buddy",
   "is_component": false,
   "data": {

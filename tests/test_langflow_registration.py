@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from scripts.register_langflow_flow import _flow_signature, _update_flow
+from scripts.register_langflow_flow import _choose_canonical, _flow_signature, _matching_flows, _update_flow
 
 
 class FakeResponse:
@@ -74,6 +74,20 @@ def test_flow_signature_detects_evaluator_name_change():
     )
 
 
+def test_duplicate_selection_prefers_evaluator_named_flow_and_ignores_archive():
+    desired = {"id": "export-id", "name": "Shop_Buddy", "endpoint_name": "shop-buddy"}
+    flows = [
+        {"id": "export-id", "name": "Shop_Buddy_legacy_export", "endpoint_name": None},
+        {"id": "old-id", "name": "Shop Buddy", "endpoint_name": "shop-buddy"},
+        {"id": "canonical-id", "name": "Shop_Buddy", "endpoint_name": "shop-buddy"},
+    ]
+
+    matches = _matching_flows(flows, desired)
+
+    assert {item["id"] for item in matches} == {"old-id", "canonical-id"}
+    assert _choose_canonical(matches, desired)["id"] == "canonical-id"
+
+
 def test_flow_update_falls_back_from_patch_to_put():
     session = FakeSession([405, 200])
 
@@ -98,6 +112,7 @@ def test_export_uses_evaluator_name_and_external_model_mode():
 
     assert flow["name"] == "Shop_Buddy"
     assert flow["endpoint_name"] == "shop-buddy"
+    assert flow["description"].endswith("Registration schema v2.")
     agents = [node for node in flow["data"]["nodes"] if node["data"]["type"] == "Agent"]
     assert len(agents) == 3
     assert all(agent["data"].get("_connectionMode") is True for agent in agents)

@@ -247,8 +247,23 @@ class PhaseSmokeTest:
                 f"LangFlow GET /api/v1/flows/ failed with HTTP {flows.status_code}. "
                 f"Response: {self.response_detail(flows)}"
             )
-        flow = next(item for item in flows.json() if item.get("name") == "Shop_Buddy")
+        all_flows = flows.json()
+        named_flows = [item for item in all_flows if item.get("name") == "Shop_Buddy"]
+        endpoint_flows = [item for item in all_flows if item.get("endpoint_name") == "shop-buddy"]
+        assert len(named_flows) == 1, f"Expected one Shop_Buddy flow, found {[item.get('id') for item in named_flows]}"
+        assert len(endpoint_flows) == 1, (
+            f"Expected one shop-buddy endpoint owner, found {[item.get('id') for item in endpoint_flows]}"
+        )
+        flow = named_flows[0]
+        assert flow.get("id") == endpoint_flows[0].get("id"), "Shop_Buddy does not own the shop-buddy endpoint."
         assert len(flow["data"]["nodes"]) == 11 and len(flow["data"]["edges"]) == 12
+        model_edges = [
+            edge for edge in flow["data"]["edges"]
+            if (edge.get("data") or {}).get("targetHandle", {}).get("fieldName") == "model"
+        ]
+        assert {edge.get("target") for edge in model_edges} == {
+            "Agent-orchestrator", "Agent-search", "Agent-cart",
+        }, f"Invalid Agent model connections: {model_edges}"
         print("PASS [phase1]: LangFlow Shop_Buddy flow is registered with 11 nodes and 12 edges")
 
         if self.has_ai_key:
@@ -256,7 +271,10 @@ class PhaseSmokeTest:
             run = None
             for attempt in range(2):
                 run = session.post(
-                    f"{self.langflow_url}/api/v1/run/shop-buddy",
+                    # Execute the exact evaluator-selected flow UUID. The
+                    # registrar separately guarantees that this same flow is
+                    # the sole owner of the friendly shop-buddy endpoint.
+                    f"{self.langflow_url}/api/v1/run/{flow['id']}",
                     json={"input_request": {
                         "input_value": "Show me office chairs.",
                         "input_type": "chat",
@@ -273,7 +291,7 @@ class PhaseSmokeTest:
                 detail = self.response_detail(run)
                 provider = self.active_provider or "configured provider"
                 raise RuntimeError(
-                    f"LangFlow Shop Buddy execution failed with HTTP {run.status_code} using {provider}: {detail}. "
+                    f"LangFlow Shop_Buddy execution failed with HTTP {run.status_code} using {provider}: {detail}. "
                     "The services remain running; inspect logs/langflow-error.log for the component traceback."
                 )
             assert run.json(), "LangFlow returned an empty execution result."
@@ -308,7 +326,9 @@ class PhaseSmokeTest:
             else:
                 self.run_phase4()
         finally:
+            previous_check = self.current_check
             self.cleanup()
+            self.current_check = previous_check
         print(f"{self.phase} evaluation smoke test passed.")
 
 
