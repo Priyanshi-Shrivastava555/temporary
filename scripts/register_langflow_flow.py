@@ -31,7 +31,7 @@ def _require_success(response: requests.Response, operation: str) -> requests.Re
     return response
 
 
-def _flow_signature(flow: dict) -> tuple[frozenset[tuple], frozenset[tuple]]:
+def _flow_signature(flow: dict) -> tuple[str | None, str | None, frozenset[tuple], frozenset[tuple]]:
     """Return the executable graph signature, ignoring only visual metadata.
 
     Comparing just node IDs and edge endpoints allowed an older saved flow to
@@ -59,7 +59,7 @@ def _flow_signature(flow: dict) -> tuple[frozenset[tuple], frozenset[tuple]]:
         )
         for edge in data.get("edges", [])
     )
-    return nodes, edges
+    return flow.get("name"), flow.get("endpoint_name"), nodes, edges
 
 
 def _update_flow(session: requests.Session, flow_id: str, flow: dict) -> requests.Response:

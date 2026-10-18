@@ -45,12 +45,19 @@ if ($InstallOnly) {
     exit 0
 }
 
+$langflowVersions = & $langflowPython -c "from importlib.metadata import version; print(version('langflow') + ',' + version('lfx'))"
+if ($LASTEXITCODE -ne 0 -or $langflowVersions.Trim() -ne '1.12.5,1.12.5') {
+    throw 'LangFlow and lfx 1.12.5 are required. Run .\start-langflow.ps1 once without -NoInstall.'
+}
+
 $env:LANGFLOW_COMPONENTS_PATH = Join-Path $projectRoot 'langflow\components'
 $env:LANGFLOW_CONFIG_DIR = Join-Path $projectRoot '.langflow-data'
 $env:LANGFLOW_AUTO_LOGIN = 'true'
 $env:LANGFLOW_SKIP_AUTH_AUTO_LOGIN = 'true'
 $env:LANGFLOW_CORS_ORIGINS = 'http://127.0.0.1:7860,http://localhost:7860'
 $env:DO_NOT_TRACK = 'true'
+$env:LANGSMITH_TRACING = 'false'
+$env:LANGCHAIN_TRACING_V2 = 'false'
 if (Test-Path (Join-Path $projectRoot '.env')) {
     foreach ($line in Get-Content (Join-Path $projectRoot '.env')) {
         if ($line -match '^\s*#' -or $line -notmatch '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$') { continue }

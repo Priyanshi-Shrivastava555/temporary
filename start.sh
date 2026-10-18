@@ -149,8 +149,8 @@ if [[ "$no_install" == true ]]; then
         echo "Frontend dependencies are missing. Run ./start.sh --$phase once without --no-install." >&2
         exit 1
     fi
-    if [[ "$needs_langflow" == true ]] && ! "$langflow_python" -c 'import langflow, requests' >/dev/null 2>&1; then
-        echo "The LangFlow environment is incomplete. Run ./start.sh --phase1 once without --no-install." >&2
+    if [[ "$needs_langflow" == true ]] && ! "$langflow_python" -c 'from importlib.metadata import version; import requests; assert version("langflow") == "1.12.5"; assert version("lfx") == "1.12.5"' >/dev/null 2>&1; then
+        echo "The LangFlow environment is missing or not version 1.12.5. Run ./start.sh --phase1 once without --no-install." >&2
         exit 1
     fi
 fi
@@ -164,7 +164,7 @@ if [[ "$no_install" == false ]]; then
     fi
 
     if [[ "$needs_langflow" == true ]]; then
-        if ! "$langflow_python" -c 'from importlib.metadata import version; assert version("langflow") == "1.12.5"' >/dev/null 2>&1; then
+        if ! "$langflow_python" -c 'from importlib.metadata import version; assert version("langflow") == "1.12.5"; assert version("lfx") == "1.12.5"' >/dev/null 2>&1; then
             echo "Installing LangFlow 1.12.5 (the first installation can take several minutes)..."
             "$langflow_python" -m pip install --upgrade pip
             "$langflow_python" -m pip install -r "$project_root/requirements-langflow.txt"
@@ -196,6 +196,8 @@ export LANGFLOW_AUTO_LOGIN="true"
 export LANGFLOW_SKIP_AUTH_AUTO_LOGIN="true"
 export LANGFLOW_CORS_ORIGINS="http://127.0.0.1:7860,http://localhost:7860"
 export DO_NOT_TRACK="true"
+export LANGSMITH_TRACING="false"
+export LANGCHAIN_TRACING_V2="false"
 export XDG_DATA_HOME="$project_root/.runtime-data"
 export CREWAI_STORAGE_DIR="shop_buddy"
 mkdir -p "$XDG_DATA_HOME"
@@ -264,6 +266,7 @@ fi
 "$venv_python" -c 'import json, sys, urllib.request; response = json.load(urllib.request.urlopen("http://127.0.0.1:8000/health", timeout=5)); assert response.get("status") == "ok", response; assert response.get("workflow") == sys.argv[1], response' "$workflow_mode"
 
 if [[ "$needs_langflow" == true ]]; then
+    "$langflow_python" -c 'from importlib.metadata import version; print("LangFlow runtime: {} (lfx {})".format(version("langflow"), version("lfx")))'
     "$langflow_python" "$project_root/scripts/register_langflow_flow.py"
 fi
 

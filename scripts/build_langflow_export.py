@@ -37,6 +37,7 @@ def _local_model_component() -> dict:
 
 LANGFLOW_URL = "http://127.0.0.1:7860"
 FLOW_ID = "a9d23675-97bd-4c72-8a32-9d8815fab311"
+FLOW_NAME = "Shop_Buddy"
 SIMPLE_AGENT_ID = "f05ffa00-25ed-4be6-9922-6d7bfa0c83ed"
 SEPARATOR = "œ"
 
@@ -167,7 +168,8 @@ def _component_node(
 
 
 def synchronize_local_model(flow: dict) -> dict:
-    """Refresh the embedded custom model without requiring a running server."""
+    """Refresh evaluator identity and embedded model without a running server."""
+    flow["name"] = FLOW_NAME
     component = _local_model_component()
     node = next(
         item
@@ -176,6 +178,13 @@ def synchronize_local_model(flow: dict) -> dict:
     )
     node["data"]["node"] = copy.deepcopy(component)
     node["data"]["node"]["display_name"] = "Shop Buddy AI Model"
+    for agent in (
+        item for item in flow["data"]["nodes"] if (item.get("data") or {}).get("type") == "Agent"
+    ):
+        # This is the flag LangFlow itself sets when an external LanguageModel
+        # is connected to a ModelInput. It keeps the saved canvas and runtime
+        # interpretation aligned across supported LangFlow installations.
+        agent["data"]["_connectionMode"] = True
     return flow
 
 
@@ -241,6 +250,7 @@ def build_flow() -> dict:
         ),
     }
     for node in (orchestrator, search_agent, cart_agent):
+        node["data"]["_connectionMode"] = True
         node["data"]["node"]["template"]["system_prompt"]["value"] = prompts[node["id"]]
         node["data"]["node"]["template"]["add_current_date_tool"]["value"] = False
         node["data"]["node"]["template"]["add_calculator_tool"]["value"] = False
@@ -275,7 +285,7 @@ def build_flow() -> dict:
 
     return {
         "id": FLOW_ID,
-        "name": "Shop Buddy",
+        "name": FLOW_NAME,
         "description": "UrbanNest agentic shopping flow with orchestration, search, cart management, and five FastAPI tools.",
         "endpoint_name": "shop-buddy",
         "is_component": False,

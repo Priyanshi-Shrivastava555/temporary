@@ -1,6 +1,6 @@
 {
   "id": "a9d23675-97bd-4c72-8a32-9d8815fab311",
-  "name": "Shop Buddy",
+  "name": "Shop_Buddy",
   "description": "UrbanNest agentic shopping flow with orchestration, search, cart management, and five FastAPI tools.",
   "endpoint_name": "shop-buddy",
   "is_component": false,
@@ -1165,7 +1165,8 @@
             "tool_mode": false
           },
           "showNode": true,
-          "type": "Agent"
+          "type": "Agent",
+          "_connectionMode": true
         },
         "dragging": false,
         "id": "Agent-orchestrator",
@@ -1788,7 +1789,8 @@
             "tool_mode": false
           },
           "showNode": true,
-          "type": "Agent"
+          "type": "Agent",
+          "_connectionMode": true
         },
         "dragging": false,
         "id": "Agent-search",
@@ -2411,7 +2413,8 @@
             "tool_mode": false
           },
           "showNode": true,
-          "type": "Agent"
+          "type": "Agent",
+          "_connectionMode": true
         },
         "dragging": false,
         "id": "Agent-cart",

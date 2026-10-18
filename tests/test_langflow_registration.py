@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 from scripts.register_langflow_flow import _flow_signature, _update_flow
 
 
@@ -63,6 +66,14 @@ def test_flow_signature_detects_executable_component_change():
     assert _flow_signature(existing) != _flow_signature(desired)
 
 
+def test_flow_signature_detects_evaluator_name_change():
+    data = {"nodes": [], "edges": []}
+
+    assert _flow_signature({"name": "Shop Buddy", "data": data}) != _flow_signature(
+        {"name": "Shop_Buddy", "data": data}
+    )
+
+
 def test_flow_update_falls_back_from_patch_to_put():
     session = FakeSession([405, 200])
 
@@ -79,3 +90,20 @@ def test_flow_update_uses_patch_when_supported():
 
     assert response.status_code == 200
     assert session.methods == ["patch"]
+
+
+def test_export_uses_evaluator_name_and_external_model_mode():
+    flow_path = Path(__file__).resolve().parents[1] / "langflow" / "shop_buddy.flow.json"
+    flow = json.loads(flow_path.read_text(encoding="utf-8"))
+
+    assert flow["name"] == "Shop_Buddy"
+    assert flow["endpoint_name"] == "shop-buddy"
+    agents = [node for node in flow["data"]["nodes"] if node["data"]["type"] == "Agent"]
+    assert len(agents) == 3
+    assert all(agent["data"].get("_connectionMode") is True for agent in agents)
+    model_edges = [
+        edge for edge in flow["data"]["edges"]
+        if edge["data"]["targetHandle"].get("fieldName") == "model"
+    ]
+    assert len(model_edges) == 3
+    assert all(edge["data"]["targetHandle"]["inputTypes"] == ["LanguageModel"] for edge in model_edges)

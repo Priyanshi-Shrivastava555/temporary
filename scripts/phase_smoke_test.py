@@ -247,9 +247,9 @@ class PhaseSmokeTest:
                 f"LangFlow GET /api/v1/flows/ failed with HTTP {flows.status_code}. "
                 f"Response: {self.response_detail(flows)}"
             )
-        flow = next(item for item in flows.json() if item.get("name") == "Shop Buddy")
+        flow = next(item for item in flows.json() if item.get("name") == "Shop_Buddy")
         assert len(flow["data"]["nodes"]) == 11 and len(flow["data"]["edges"]) == 12
-        print("PASS [phase1]: LangFlow Shop Buddy flow is registered with 11 nodes and 12 edges")
+        print("PASS [phase1]: LangFlow Shop_Buddy flow is registered with 11 nodes and 12 edges")
 
         if self.has_ai_key:
             self.current_check = f"LangFlow live Shop Buddy execution ({self.active_provider or 'configured provider'})"
