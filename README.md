@@ -18,7 +18,7 @@ Prerequisites: a supported Python and Node.js version from the table above must 
 2. Run `start.cmd` (or `powershell -ExecutionPolicy Bypass -File .\start.ps1`).
 3. Open `http://127.0.0.1:5173`. API docs are at `http://127.0.0.1:8000/docs`.
 
-The first launch creates a local Python virtual environment and installs the backend and frontend packages. The app works without an AI key: its deterministic shopping tools and LangGraph memory still execute all operations. Provider order is OpenAI, then Gemini, then local response generation. Gemini is also attempted when OpenAI is configured but its gateway is unavailable. No request is sent to either provider when no key exists.
+The first launch creates a local Python virtual environment and installs the backend and frontend packages. The app works without an AI key: its deterministic shopping tools and LangGraph memory still execute all operations. At startup, a minimal request validates the configured provider. In `SHOP_BUDDY_AI_PROVIDER=auto` mode, OpenAI is tried first and Gemini is selected automatically when the OpenAI key, gateway, or configured model is unavailable. No provider request is made when both keys are empty.
 
 ## Quick start on Linux
 
@@ -71,7 +71,7 @@ The first run must omit `--no-install` so application dependencies are installed
 - LangFlow for Phase 1: `http://127.0.0.1:7860`
 - Logs: `logs/`
 
-All smoke tests use disposable cart sessions and clean up afterwards. When an AI key is present, Phase 1 also invokes the live LangFlow flow, while Phase 2 and Phase 3 require their real AI runtimes to complete without falling back. Without a key, deterministic API behavior and framework structure remain testable, while live provider execution is reported as skipped.
+All smoke tests use disposable cart sessions and clean up afterwards. When a provider passes startup validation, Phase 1 also invokes the live LangFlow flow, while Phase 2 and Phase 3 require their real AI runtimes to complete without falling back. Without a valid provider, deterministic API behavior and framework structure remain testable, while live provider execution is reported as skipped. Provider validation and live-run failures include the HTTP status and provider response instead of hiding the cause behind a generic `500 Server Error`.
 
 The services run with `nohup`, which is why no terminal remains open. Stop every process managed by the launcher with:
 
@@ -80,6 +80,8 @@ The services run with `nohup`, which is why no terminal remains open. Stop every
 ```
 
 The `.env` template contains every variable named in Phase 1: `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `ODOO_ENDPOINT`, `ODOO_DB_NAME`, `ODOO_ADMIN_USERNAME`, and `ODOO_ADMIN_PASSWORD`. The proxy URL is preconfigured, but secret values and deployment-specific Odoo values must be supplied by the operator. The self-contained build uses SQLite, as allowed for this implementation, so the Odoo values are reserved for a future Odoo adapter. Phase selection uses a process-only override and never rewrites `.env`.
+
+If a previous Phase 1 run saved an older copy of the flow, restart it with `./start.sh --stop` followed by `./start.sh --phase1 --no-install`. Registration compares executable component code, prompts, outputs, and tool handles and updates stale flows automatically. Use `SHOP_BUDDY_AI_PROVIDER=openai` or `gemini` only when you intentionally want to disable automatic provider fallback.
 
 The reference proxy belongs in `OPENAI_BASE_URL`. If you use an official OpenAI key instead of that proxy, leave `OPENAI_BASE_URL` empty so the SDK uses `https://api.openai.com/v1`. Gemini defaults to the current `gemini-3.5-flash` model; either model remains configurable in `.env`.
 

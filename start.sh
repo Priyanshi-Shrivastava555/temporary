@@ -199,9 +199,11 @@ export XDG_DATA_HOME="$project_root/.runtime-data"
 export CREWAI_STORAGE_DIR="shop_buddy"
 mkdir -p "$XDG_DATA_HOME"
 
-if [[ -z "${OPENAI_API_KEY:-}" && -z "${GEMINI_API_KEY:-}" ]]; then
-    echo "WARNING: no OpenAI or Gemini key is configured. Deterministic shopping operations will be tested,"
-    echo "         but live AI execution for $phase cannot be verified until a valid key is added to .env."
+echo "Validating configured AI provider..."
+export SHOP_BUDDY_ACTIVE_AI_PROVIDER
+SHOP_BUDDY_ACTIVE_AI_PROVIDER="$("$venv_python" "$project_root/scripts/select_ai_provider.py")"
+if [[ "$SHOP_BUDDY_ACTIVE_AI_PROVIDER" == "none" ]]; then
+    echo "INFO: live AI execution is disabled for this run; deterministic shopping operations will still be tested."
 fi
 if [[ -z "${ODOO_ENDPOINT:-}" || -z "${ODOO_DB_NAME:-}" || -z "${ODOO_ADMIN_USERNAME:-}" || -z "${ODOO_ADMIN_PASSWORD:-}" ]]; then
     echo "INFO: Odoo credentials are incomplete; the approved SQLite implementation will be used."

@@ -10,6 +10,7 @@ import copy
 import importlib.util
 import json
 import sys
+import argparse
 from pathlib import Path
 
 import requests
@@ -165,6 +166,19 @@ def _component_node(
     return node
 
 
+def synchronize_local_model(flow: dict) -> dict:
+    """Refresh the embedded custom model without requiring a running server."""
+    component = _local_model_component()
+    node = next(
+        item
+        for item in flow["data"]["nodes"]
+        if (item.get("data") or {}).get("type") == "ext:shop_buddy:ShopBuddyModelComponent@extra"
+    )
+    node["data"]["node"] = copy.deepcopy(component)
+    node["data"]["node"]["display_name"] = "Shop Buddy AI Model"
+    return flow
+
+
 def build_flow() -> dict:
     session = _authenticated_session()
     examples_response = session.get(f"{LANGFLOW_URL}/api/v1/flows/basic_examples/", timeout=120)
@@ -199,9 +213,10 @@ def build_flow() -> dict:
         "ChatOutput-shopbuddy", 1710, 260, "Chat Output",
     )
     model_cache_key = "ext:shop_buddy:ShopBuddyModelComponent@extra"
-    model_component = all_components.get("shop_buddy", {}).get(model_cache_key)
-    if model_component is None:
-        model_component = _local_model_component()
+    # Always embed the checked-in source. A running LangFlow process may still
+    # have an older component cached even though this repository has been
+    # updated, which would otherwise recreate the same stale-flow 500.
+    model_component = _local_model_component()
     model_node = _component_node(
         wrapper, model_component, model_cache_key,
         "ShopBuddyModel-shopbuddy", 430, -250, "Shop Buddy AI Model",
@@ -273,11 +288,23 @@ def build_flow() -> dict:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--sync-local-model",
+        action="store_true",
+        help="Refresh the embedded Shop Buddy model source without contacting LangFlow.",
+    )
+    args = parser.parse_args()
     output = Path(__file__).resolve().parents[1] / "langflow" / "shop_buddy.flow.json"
+    if args.sync_local_model:
+        flow = synchronize_local_model(json.loads(output.read_text(encoding="utf-8")))
+        output.write_text(json.dumps(flow, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        print(f"Synchronized the local model in {output}.")
+        return 0
     try:
         flow = build_flow()
     except (requests.RequestException, KeyError, StopIteration) as exc:
-        print(f"Could not build LangFlow export: {exc}", file=sys.stderr)
+        print(f"Could not build LangFlow export: {exc!r}", file=sys.stderr)
         return 1
     output.write_text(json.dumps(flow, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"Wrote {output} ({len(flow['data']['nodes'])} nodes, {len(flow['data']['edges'])} edges).")

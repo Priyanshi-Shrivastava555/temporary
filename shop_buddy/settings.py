@@ -30,12 +30,22 @@ class Settings:
 
 def get_settings() -> Settings:
     raw_path = os.getenv("SHOP_BUDDY_DB_PATH", "data/shop_buddy.db")
+    active_provider = os.getenv("SHOP_BUDDY_ACTIVE_AI_PROVIDER", "").strip().lower()
+    openai_key = os.getenv("OPENAI_API_KEY") or None
+    gemini_key = os.getenv("GEMINI_API_KEY") or None
+    if active_provider == "openai":
+        gemini_key = None
+    elif active_provider == "gemini":
+        openai_key = None
+    elif active_provider in {"none", "local"}:
+        openai_key = None
+        gemini_key = None
     return Settings(
         database_path=Path(raw_path).resolve(),
-        openai_api_key=os.getenv("OPENAI_API_KEY") or None,
+        openai_api_key=openai_key,
         openai_base_url=os.getenv("OPENAI_BASE_URL") or None,
         openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-        gemini_api_key=os.getenv("GEMINI_API_KEY") or None,
+        gemini_api_key=gemini_key,
         # Gemini 2.0 Flash was shut down on 2026-06-01. Keep a current,
         # configurable default so adding only GEMINI_API_KEY is sufficient.
         gemini_model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),

@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 from pathlib import Path
+import time
 import uuid
 from typing import Any
 
@@ -26,7 +28,12 @@ class PhaseSmokeTest:
         self.langflow_url = langflow_url.rstrip("/")
         self.session_id = f"{phase}-smoke-{uuid.uuid4()}"
         self.sessions_to_clean = {self.session_id}
-        self.has_ai_key = bool(os.getenv("OPENAI_API_KEY") or os.getenv("GEMINI_API_KEY"))
+        self.active_provider = os.getenv("SHOP_BUDDY_ACTIVE_AI_PROVIDER", "").strip().lower()
+        if self.active_provider:
+            self.has_ai_key = self.active_provider in {"openai", "gemini"}
+        else:
+            # Preserve direct invocation outside the launcher.
+            self.has_ai_key = bool(os.getenv("OPENAI_API_KEY") or os.getenv("GEMINI_API_KEY"))
 
     def request(self, method: str, path: str, **kwargs: Any) -> dict[str, Any]:
         response = requests.request(method, f"{self.api_url}{path}", timeout=kwargs.pop("timeout", 120), **kwargs)
@@ -172,19 +179,35 @@ class PhaseSmokeTest:
         print("PASS [phase1]: LangFlow Shop Buddy flow is registered with 11 nodes and 12 edges")
 
         if self.has_ai_key:
-            run = session.post(
-                f"{self.langflow_url}/api/v1/run/shop-buddy",
-                json={"input_request": {
-                    "input_value": "Show me office chairs.",
-                    "input_type": "chat",
-                    "output_type": "chat",
-                    "session_id": f"langflow-smoke-{uuid.uuid4()}",
-                }},
-                timeout=300,
-            )
-            run.raise_for_status()
+            run = None
+            for attempt in range(2):
+                run = session.post(
+                    f"{self.langflow_url}/api/v1/run/shop-buddy",
+                    json={"input_request": {
+                        "input_value": "Show me office chairs.",
+                        "input_type": "chat",
+                        "output_type": "chat",
+                        "session_id": f"langflow-smoke-{uuid.uuid4()}",
+                    }},
+                    timeout=300,
+                )
+                if run.status_code < 500 or attempt == 1:
+                    break
+                time.sleep(2)
+            assert run is not None
+            if not run.ok:
+                try:
+                    detail = json.dumps(run.json(), default=str)
+                except ValueError:
+                    detail = run.text
+                detail = " ".join(detail.split())[:1500] or "LangFlow returned no error details."
+                provider = self.active_provider or "configured provider"
+                raise RuntimeError(
+                    f"LangFlow Shop Buddy execution failed with HTTP {run.status_code} using {provider}: {detail}. "
+                    "The services remain running; inspect logs/langflow-error.log for the component traceback."
+                )
             assert run.json(), "LangFlow returned an empty execution result."
-            print("PASS [phase1]: live LangFlow AI execution")
+            print(f"PASS [phase1]: live LangFlow AI execution using {self.active_provider or 'configured provider'}")
         else:
             print("SKIP [phase1]: live LangFlow AI execution requires OPENAI_API_KEY or GEMINI_API_KEY")
 

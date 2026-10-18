@@ -12,10 +12,10 @@ from pydantic import SecretStr
 
 
 class ShopBuddyModelComponent(Component):
-    """Select OpenAI when configured, otherwise use Gemini from the environment."""
+    """Use the provider that the launcher validated, with direct-run fallback."""
 
     display_name = "Shop Buddy AI Model"
-    description = "Uses OPENAI_API_KEY first, then GEMINI_API_KEY, without storing either key in the flow export."
+    description = "Uses the startup-validated OpenAI or Gemini provider without storing keys in the flow export."
     name = "ShopBuddyModel"
     icon = "BrainCircuit"
     trace_type = "model"
@@ -74,8 +74,9 @@ class ShopBuddyModelComponent(Component):
         return str(value or "").strip()
 
     def build_model(self) -> BaseLanguageModel:
+        active_provider = os.getenv("SHOP_BUDDY_ACTIVE_AI_PROVIDER", "").strip().lower()
         openai_key = self._secret(self.openai_api_key) or os.getenv("OPENAI_API_KEY", "").strip()
-        if openai_key:
+        if openai_key and active_provider not in {"gemini", "none", "local"}:
             return ChatOpenAI(
                 api_key=SecretStr(openai_key),
                 base_url=(self.openai_base_url or os.getenv("OPENAI_BASE_URL", "")).strip() or None,
@@ -84,11 +85,14 @@ class ShopBuddyModelComponent(Component):
             )
 
         gemini_key = self._secret(self.gemini_api_key) or os.getenv("GEMINI_API_KEY", "").strip()
-        if gemini_key:
+        if gemini_key and active_provider not in {"openai", "none", "local"}:
             return ChatGoogleGenerativeAI(
                 api_key=SecretStr(gemini_key),
                 model=(self.gemini_model or os.getenv("GEMINI_MODEL", "gemini-3.5-flash")).strip(),
                 temperature=self.temperature,
             )
 
-        raise ValueError("Set OPENAI_API_KEY or GEMINI_API_KEY in .env, then restart LangFlow.")
+        raise ValueError(
+            "No validated AI provider is active. Set a valid OPENAI_API_KEY or GEMINI_API_KEY in .env, "
+            "then restart with ./start.sh --phase1."
+        )

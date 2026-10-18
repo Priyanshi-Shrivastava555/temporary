@@ -15,14 +15,31 @@ FLOW_FILE = Path(__file__).resolve().parents[1] / "langflow" / "shop_buddy.flow.
 
 
 def _flow_signature(flow: dict) -> tuple[frozenset[tuple], frozenset[tuple]]:
-    """Return the stable graph shape, ignoring server-managed metadata."""
+    """Return the executable graph signature, ignoring only visual metadata.
+
+    Comparing just node IDs and edge endpoints allowed an older saved flow to
+    survive after prompts, custom-component code, model settings, or tool
+    wiring changed.  LangFlow would then execute that stale payload and report
+    an opaque HTTP 500.  Include the component templates and full handles so a
+    launcher restart always reconciles the saved flow with the repository.
+    """
     data = flow.get("data") or {}
     nodes = frozenset(
-        (node.get("id"), (node.get("data") or {}).get("type"))
+        (
+            node.get("id"),
+            (node.get("data") or {}).get("type"),
+            json.dumps(((node.get("data") or {}).get("node") or {}).get("template") or {}, sort_keys=True),
+            json.dumps(((node.get("data") or {}).get("node") or {}).get("outputs") or [], sort_keys=True),
+        )
         for node in data.get("nodes", [])
     )
     edges = frozenset(
-        (edge.get("source"), edge.get("target"))
+        (
+            edge.get("source"),
+            edge.get("target"),
+            edge.get("sourceHandle"),
+            edge.get("targetHandle"),
+        )
         for edge in data.get("edges", [])
     )
     return nodes, edges

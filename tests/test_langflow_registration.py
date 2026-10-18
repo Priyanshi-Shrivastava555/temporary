@@ -27,6 +27,35 @@ def test_flow_signature_ignores_server_metadata():
     assert _flow_signature(existing) == _flow_signature(desired)
 
 
+def test_flow_signature_detects_executable_component_change():
+    desired = {
+        "data": {
+            "nodes": [{
+                "id": "model",
+                "data": {"type": "ShopBuddyModel", "node": {
+                    "template": {"code": {"value": "new source"}},
+                    "outputs": [{"name": "model"}],
+                }},
+            }],
+            "edges": [],
+        }
+    }
+    existing = {
+        "data": {
+            "nodes": [{
+                "id": "model",
+                "data": {"type": "ShopBuddyModel", "node": {
+                    "template": {"code": {"value": "old source"}},
+                    "outputs": [{"name": "model"}],
+                }},
+            }],
+            "edges": [],
+        }
+    }
+
+    assert _flow_signature(existing) != _flow_signature(desired)
+
+
 def test_flow_update_falls_back_from_patch_to_put():
     session = FakeSession([405, 200])
 
