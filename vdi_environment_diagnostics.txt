@@ -1,0 +1,1 @@
+Run the command documented in the assistant response on the VDI, then commit this redacted report without evaluating.
