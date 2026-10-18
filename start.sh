@@ -104,7 +104,7 @@ if [[ "$phase" == "phase5" && "$api_only" == true ]]; then
     exit 2
 fi
 
-required_commands=(python3 setsid)
+required_commands=(python3 setsid ps)
 if [[ "$api_only" == false ]]; then
     required_commands+=(node npm)
 fi
@@ -215,6 +215,68 @@ fi
 port_open() {
     "$venv_python" -c 'import socket, sys; sock = socket.socket(); sock.settimeout(0.3); result = sock.connect_ex(("127.0.0.1", int(sys.argv[1]))); sock.close(); raise SystemExit(0 if result == 0 else 1)' "$1"
 }
+
+stop_stale_project_listener() {
+    local service_name="$1"
+    local port="$2"
+    local required_command_text="$3"
+    port_open "$port" || return 0
+
+    local listener_ids=()
+    mapfile -t listener_ids < <("$venv_python" "$project_root/scripts/listening_pids.py" "$port")
+    if (( ${#listener_ids[@]} == 0 )); then
+        echo "Port $port is occupied, but its process could not be identified. Stop that process and rerun ./start.sh --$phase." >&2
+        exit 1
+    fi
+
+    local process_id process_cwd process_command process_group group_cwd group_command
+    for process_id in "${listener_ids[@]}"; do
+        process_cwd="$(readlink -f "/proc/$process_id/cwd" 2>/dev/null || true)"
+        process_command="$(tr '\0' ' ' < "/proc/$process_id/cmdline" 2>/dev/null || true)"
+        if [[ "$process_cwd" != "$project_root"* || "$process_command" != *"$required_command_text"* ]]; then
+            echo "Refusing to stop PID $process_id on port $port because it is not this project's $service_name service." >&2
+            echo "Command: ${process_command:-<unavailable>}" >&2
+            exit 1
+        fi
+    done
+
+    for process_id in "${listener_ids[@]}"; do
+        kill -0 "$process_id" 2>/dev/null || continue
+        process_group="$(ps -o pgid= -p "$process_id" 2>/dev/null | tr -cd '0-9')"
+        echo "Stopping stale $service_name listener on port $port (PID $process_id)..."
+        group_cwd=""
+        group_command=""
+        if [[ -n "$process_group" ]]; then
+            group_cwd="$(readlink -f "/proc/$process_group/cwd" 2>/dev/null || true)"
+            group_command="$(tr '\0' ' ' < "/proc/$process_group/cmdline" 2>/dev/null || true)"
+        fi
+        if [[ -n "$process_group" && "$group_cwd" == "$project_root"* && "$group_command" == *"$required_command_text"* ]]; then
+            kill -TERM -- "-$process_group" 2>/dev/null || kill -TERM "$process_id" 2>/dev/null || true
+        else
+            kill -TERM "$process_id" 2>/dev/null || true
+        fi
+    done
+
+    for _attempt in $(seq 1 20); do
+        port_open "$port" || return 0
+        sleep 0.25
+    done
+    echo "The stale $service_name process did not release port $port. Stop it manually and rerun ./start.sh --$phase." >&2
+    exit 1
+}
+
+# An explicit phase run must test the freshly configured processes. PID files
+# can be lost while a detached service survives, so recover listeners that are
+# demonstrably owned by this checkout instead of silently testing an old server.
+if [[ "$phase_requested" == true ]]; then
+    stop_stale_project_listener api 8000 "uvicorn main:app"
+    if [[ "$api_only" == false ]]; then
+        stop_stale_project_listener frontend 5173 "vite"
+    fi
+    if [[ "$needs_langflow" == true ]]; then
+        stop_stale_project_listener langflow 7860 "langflow"
+    fi
+fi
 
 if ! port_open 8000; then
     echo "Starting FastAPI in $workflow_mode mode..."
