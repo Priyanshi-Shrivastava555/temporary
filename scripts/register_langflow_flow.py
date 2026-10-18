@@ -14,6 +14,37 @@ LANGFLOW_URL = os.getenv("LANGFLOW_URL", "http://127.0.0.1:7860").rstrip("/")
 FLOW_FILE = Path(__file__).resolve().parents[1] / "langflow" / "shop_buddy.flow.json"
 
 
+def _flow_signature(flow: dict) -> tuple[frozenset[tuple], frozenset[tuple]]:
+    """Return the stable graph shape, ignoring server-managed metadata."""
+    data = flow.get("data") or {}
+    nodes = frozenset(
+        (node.get("id"), (node.get("data") or {}).get("type"))
+        for node in data.get("nodes", [])
+    )
+    edges = frozenset(
+        (edge.get("source"), edge.get("target"))
+        for edge in data.get("edges", [])
+    )
+    return nodes, edges
+
+
+def _update_flow(session: requests.Session, flow_id: str, flow: dict) -> requests.Response:
+    """Support LangFlow releases that expose PATCH, PUT, or both."""
+    url = f"{LANGFLOW_URL}/api/v1/flows/{flow_id}"
+    rejected: list[str] = []
+    for method in ("patch", "put"):
+        response = session.request(method, url, json=flow, timeout=120)
+        if response.status_code in {404, 405, 422}:
+            rejected.append(f"{method.upper()}={response.status_code}")
+            continue
+        response.raise_for_status()
+        return response
+    raise RuntimeError(
+        "This LangFlow server does not expose a compatible flow-update method "
+        f"at {url} ({', '.join(rejected)})."
+    )
+
+
 def authenticated_session() -> requests.Session:
     session = requests.Session()
     last_error: Exception | None = None
@@ -47,7 +78,10 @@ def main() -> int:
 
     if existing:
         flow["id"] = existing["id"]
-        saved = session.put(f"{LANGFLOW_URL}/api/v1/flows/{existing['id']}", json=flow, timeout=120)
+        if _flow_signature(existing) == _flow_signature(flow):
+            print(f"LangFlow flow already current: {flow['name']} ({existing['id']})")
+            return 0
+        saved = _update_flow(session, existing["id"], flow)
         action = "updated"
     else:
         saved = session.post(f"{LANGFLOW_URL}/api/v1/flows/", json=flow, timeout=120)
