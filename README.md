@@ -2,6 +2,8 @@
 
 Shop Buddy is a conversational shopping assistant with a FastAPI backend, a modern React interface, a SQLite product/cart store, and a stateful agent-style workflow. It supports product discovery, price and category filters, add/update/remove/view-cart actions, combined search-and-add requests, and follow-ups such as "add the second one".
 
+For complete continuation context—including the original five-phase requirements, implementation map, evaluator success criteria, current Phase 1 authentication blocker, and safe next steps—read [Project Handoff and Evaluation Guide](docs/PROJECT_HANDOFF_AND_EVALUATION_GUIDE.md).
+
 ## Runtime versions
 
 - **Python:** 3.11 or 3.12; Python 3.12 is recommended and is the version used for the full local verification.
