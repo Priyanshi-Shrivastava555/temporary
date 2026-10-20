@@ -14,7 +14,9 @@ if not _storage_setting.is_absolute():
     _storage_setting = Path(__file__).resolve().parents[1] / ".runtime-data" / _storage_setting
 _storage_setting.mkdir(parents=True, exist_ok=True)
 os.environ["CREWAI_STORAGE_DIR"] = str(_storage_setting)
-os.environ.setdefault("CREWAI_TRACING_ENABLED", "false")
+os.environ["CREWAI_TRACING_ENABLED"] = "false"
+os.environ["LANGSMITH_TRACING"] = "false"
+os.environ["LANGCHAIN_TRACING_V2"] = "false"
 # CrewAI uses this flag only to suppress its interactive first-run tracing
 # prompt. Assessment runs are non-interactive and tracing is already disabled.
 os.environ.setdefault("CREWAI_TESTING", "true")

@@ -141,8 +141,8 @@ class ShopWorkflow:
             )
             return graph_state["result"]
         if self.agent_runtime is not None and self.agent_runtime.configured:
+            cart_before_agent = self.store.get_cart(session_id)
             try:
-                cart_before_agent = self.store.get_cart(session_id)
                 if self.settings.workflow_mode == "crewai":
                     response = self.agent_runtime.kickoff(message, session_id)
                 else:
@@ -151,6 +151,7 @@ class ShopWorkflow:
             except Exception:
                 # Keep the storefront operational when a gateway is unavailable.
                 # LLMResponseWriter will independently attempt the next provider.
+                self._restore_cart(session_id, cart_before_agent)
                 result = self._run_local(message, session_id)
                 result["workflow"] = self.settings.workflow_mode
                 result["trace"].insert(0, {
