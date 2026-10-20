@@ -1,11 +1,21 @@
 """Five LangFlow Tool Mode components backed by the Shop Buddy FastAPI API."""
 from __future__ import annotations
 
+from importlib import import_module
+from importlib.util import find_spec
+
 import requests
 
-from lfx.custom import Component
-from lfx.io import FloatInput, IntInput, Output, StrInput
-from lfx.schema import Data
+_sdk_root = "lfx" if find_spec("lfx") is not None else "langflow"
+_custom = import_module(f"{_sdk_root}.custom")
+_io = import_module(f"{_sdk_root}.io")
+_schema = import_module(f"{_sdk_root}.schema")
+Component = _custom.Component
+FloatInput = _io.FloatInput
+IntInput = _io.IntInput
+Output = _io.Output
+StrInput = _io.StrInput
+Data = _schema.Data
 
 
 def _api_url_input() -> StrInput:

@@ -1,13 +1,14 @@
 Shop Buddy Phase 1 diagnostic report
-generated_utc=2026-10-18T17:15:02.291674+00:00
+generated_utc=2026-10-20T09:48:41.085777+00:00
 platform=Linux-7.0.0-1012-aws-x86_64-with-glibc2.39
 python=3.12.3
 langflow_package=1.12.5
 lfx_package=1.12.5
 langflow_url=http://127.0.0.1:7860
+env_file=/home/ubuntu/Desktop/The Smart Shopping Demo/temporary/.env
 port_7860_listener_count=2
-port_7860_process=pid=23504; exe=/usr/bin/python3.12; cwd=/home/ubuntu/Desktop/The Smart Shopping Demo/temporary; command=/home/ubuntu/Desktop/The Smart Shopping Demo/temporary/.langflow-venv/bin/python -m langflow run --host 127.0.0.1 --port 7860
-port_7860_process=pid=23512; exe=/usr/bin/python3.12; cwd=/home/ubuntu/Desktop/The Smart Shopping Demo/temporary; command=/home/ubuntu/Desktop/The Smart Shopping Demo/temporary/.langflow-venv/bin/python -m langflow run --host 127.0.0.1 --port 7860
+port_7860_process=pid=3293; exe=/usr/bin/python3.12; cwd=/Software/langenv; command=/Software/langenv/bin/python3 /Software/langenv/bin/langflow run
+port_7860_process=pid=3294; exe=/usr/bin/python3.12; cwd=/Software/langenv; command=/Software/langenv/bin/python3 /Software/langenv/bin/langflow run
 env_LANGFLOW_API_KEY=configured
 env_OPENAI_API_KEY=configured
 env_OPENAI_BASE_URL=configured
@@ -15,14 +16,17 @@ env_ODOO_ENDPOINT=missing
 env_ODOO_DB_NAME=missing
 env_ODOO_ADMIN_USERNAME=configured
 env_ODOO_ADMIN_PASSWORD=configured
-langflow_api_key_fingerprint_sha256=c8c50c956c88
+persisted_LANGFLOW_API_KEY=configured
+persisted_key_matches_process=yes
+persisted_langflow_api_key_fingerprint_sha256=f341f0853927
 health_check=HTTP 200; content-type=application/json; final-url=http://127.0.0.1:7860/health_check
 authenticated_flows=HTTP 200; content-type=application/json; final-url=http://127.0.0.1:7860/api/v1/flows/
 shop_buddy_named_flow_count=1
 shop_buddy_endpoint_owner_count=1
-shop_buddy_flow_id=7516876d-5d1d-4298-9044-cf953ce5e911
+shop_buddy_flow_id=323acebb-ffef-4e60-af74-69f446badec3
 shop_buddy_nodes=11
 shop_buddy_edges=12
 openapi=HTTP 200; content-type=application/json; final-url=http://127.0.0.1:7860/openapi.json
-run_routes=["/api/v1/run/advanced/{flow_id_or_name}", "/api/v1/run/{flow_id_or_name}"]
+run_routes=["/api/v1/run/advanced/{flow_id}", "/api/v1/run/{flow_id_or_name}"]
 readiness=PASS
+phase1_smoke=PASS

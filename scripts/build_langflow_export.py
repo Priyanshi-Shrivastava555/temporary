@@ -172,7 +172,7 @@ def _component_node(
 
 
 def synchronize_local_model(flow: dict) -> dict:
-    """Refresh evaluator identity and embedded model without a running server."""
+    """Refresh evaluator identity and embedded custom code without a server."""
     flow["name"] = FLOW_NAME
     flow["description"] = FLOW_DESCRIPTION
     component = _local_model_component()
@@ -183,6 +183,15 @@ def synchronize_local_model(flow: dict) -> dict:
     )
     node["data"]["node"] = copy.deepcopy(component)
     node["data"]["node"]["display_name"] = "Shop Buddy AI Model"
+
+    tools_source = (
+        Path(__file__).resolve().parents[1] / "langflow" / "components" / "shop_buddy" / "tools.py"
+    ).read_text(encoding="utf-8")
+    for tool_node in flow["data"]["nodes"]:
+        tool_type = (tool_node.get("data") or {}).get("type", "")
+        if tool_type.startswith("ext:shop_buddy:") and tool_type.endswith("Component@extra"):
+            if tool_type != "ext:shop_buddy:ShopBuddyModelComponent@extra":
+                tool_node["data"]["node"]["template"]["code"]["value"] = tools_source
     for agent in (
         item for item in flow["data"]["nodes"] if (item.get("data") or {}).get("type") == "Agent"
     ):
@@ -207,6 +216,25 @@ def synchronize_local_model(flow: dict) -> dict:
             raw_target = edge.get("targetHandle")
             if isinstance(raw_target, str):
                 edge["targetHandle"] = raw_target.replace("œtypeœ: œmodelœ", "œtypeœ: œotherœ")
+
+    # A server can retain an old schema cache after the five components are
+    # updated together from ``tools.py``.  The component type remains correct,
+    # but the cached outer-node label may be copied from the first tool.  Keep
+    # the checked-in visual export self-describing for the LangFlow canvas and
+    # structural assessment checks even when no server is available.
+    tool_display_names = {
+        "ext:shop_buddy:SearchProductsComponent@extra": "Search Products",
+        "ext:shop_buddy:AddProductToCartComponent@extra": "AddProductToCart",
+        "ext:shop_buddy:UpdateCartItemComponent@extra": "UpdateCartItem",
+        "ext:shop_buddy:DeleteCartItemComponent@extra": "DeleteCartItem",
+        "ext:shop_buddy:GetCartItemsComponent@extra": "GetCartItems",
+    }
+    for node in flow["data"]["nodes"]:
+        data = node.get("data") or {}
+        display_name = tool_display_names.get(data.get("type"))
+        if display_name:
+            data["display_name"] = display_name
+            data.setdefault("node", {})["display_name"] = display_name
     return flow
 
 

@@ -230,6 +230,7 @@ Anonymous carts and memory use the supplied browser `session_id`. Signed-in user
 - Registration detects executable changes in templates, prompts, outputs, and handles. It archives legacy duplicates and creates a fresh endpoint owner when needed.
 - LangFlow and lfx are pinned to 1.12.5 in `.langflow-venv`.
 - `ensure_langflow_api_key.py` uses LangFlow auto-login, creates a server-issued key named `Shop Buddy Evaluator`, verifies it against `/api/v1/flows/`, and atomically saves it to `.env` with the existing file mode.
+- After verification, `start.sh` imports only `LANGFLOW_API_KEY` into the current user-systemd environment. This lets an evaluator launched by that manager use the same server-issued key; it is session-scoped and does not prove an already-running browser process has refreshed its environment.
 - The live run payload is sent directly to `/api/v1/run/shop-buddy` with root fields `input_value`, `input_type`, `output_type`, and `session_id`. It is not incorrectly nested under `input_request`.
 
 ### Phase 1 smoke scenarios
@@ -485,7 +486,7 @@ Use the report evidence in this order:
 2. If `/Software/langenv/bin/python3` owns port 7860, inspect its LangFlow version, authentication mode, existing flows, and key fingerprint. Prefer updating or registering the flow into that service if it is evaluator-owned and compatible.
 3. If `.langflow-venv/bin/python` owns port 7860, confirm its process environment and `.env` contain the same `LANGFLOW_API_KEY` fingerprint.
 4. Test `/api/v1/flows/` with no key and with each discovered key. HTTP 200 identifies a usable credential; HTTP 401 or 403 identifies a mismatch.
-5. Confirm that the evaluator can load `.env`. A key persisted in the repository directory does not automatically enter an already-running evaluator process.
+5. Confirm that the evaluator can load `.env` or inherits the user-systemd environment. The Phase 1 launcher imports its verified key into the latter, but a key persisted in the repository directory does not automatically enter an already-running evaluator process.
 6. Confirm exactly one `Shop_Buddy` flow owns `shop-buddy` and that `/api/v1/run/{flow_id_or_name}` exists.
 7. Only after the evaluator's credential source is understood should startup either reuse the VDI service or replace it with the project service.
 8. Run the project smoke test one final time, inspect redacted reports and `logs/langflow-error.log`, and only then use an evaluation attempt.

@@ -2,13 +2,26 @@
 from __future__ import annotations
 
 import os
+from importlib import import_module
+from importlib.util import find_spec
 
 from langchain_core.language_models import BaseLanguageModel
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
-from lfx.custom import Component
-from lfx.io import FloatInput, Output, SecretStrInput, StrInput
 from pydantic import SecretStr
+
+# LangFlow 1.5+ moved its component SDK to ``lfx``.  Evaluator VDIs can still
+# ship LangFlow 1.4, where the same public objects live under ``langflow``.
+# Resolve them dynamically: LangFlow's custom-code validator eagerly imports
+# every literal import it sees, including imports inside a try/except block.
+_sdk_root = "lfx" if find_spec("lfx") is not None else "langflow"
+_custom = import_module(f"{_sdk_root}.custom")
+_io = import_module(f"{_sdk_root}.io")
+Component = _custom.Component
+FloatInput = _io.FloatInput
+Output = _io.Output
+SecretStrInput = _io.SecretStrInput
+StrInput = _io.StrInput
 
 
 class ShopBuddyModelComponent(Component):

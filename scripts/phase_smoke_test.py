@@ -74,7 +74,7 @@ class PhaseSmokeTest:
             content = json.dumps(response.json(), default=str)
         except ValueError:
             content = response.text
-        return " ".join(content.split())[:2000] or "<empty response body>"
+        return PhaseSmokeTest.redact(" ".join(content.split())[:2000]) or "<empty response body>"
 
     @classmethod
     def require_json_response(cls, response: requests.Response, operation: str) -> dict[str, Any]:
@@ -287,7 +287,7 @@ class PhaseSmokeTest:
         assert len(flow["data"]["nodes"]) == 11 and len(flow["data"]["edges"]) == 12
         model_edges = [
             edge for edge in flow["data"]["edges"]
-            if (edge.get("data") or {}).get("targetHandle", {}).get("fieldName") == "model"
+            if (edge.get("data") or {}).get("targetHandle", {}).get("fieldName") in {"model", "agent_llm"}
         ]
         assert {edge.get("target") for edge in model_edges} == {
             "Agent-orchestrator", "Agent-search", "Agent-cart",

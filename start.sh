@@ -11,11 +11,14 @@ no_install=false
 run_smoke=false
 stop_only=false
 api_only=false
+reuse_langflow=false
 
 usage() {
     cat <<'EOF'
 Usage:
   ./start.sh --phase1 [--api-only] [--no-install]   LangFlow + FastAPI + Phase 1 smoke test
+  ./start.sh --phase1 --reuse-langflow [--api-only] [--no-install]
+                                                 Reuse a VDI-managed LangFlow on port 7860
   ./start.sh --phase2 [--api-only] [--no-install]   CrewAI + FastAPI + Phase 2 smoke test
   ./start.sh --phase3 [--no-install]   AutoGen + FastAPI + React + Phase 3 smoke test
   ./start.sh --phase4 [--no-install]   LangGraph + FastAPI + React + Phase 4 smoke test
@@ -40,6 +43,7 @@ for argument in "$@"; do
         --smoke-test) run_smoke=true ;;
         --no-install) no_install=true ;;
         --api-only) api_only=true ;;
+        --reuse-langflow) reuse_langflow=true ;;
         --stop) stop_only=true ;;
         -h|--help) usage; exit 0 ;;
         *) echo "Unknown option: $argument" >&2; usage; exit 2 ;;
@@ -99,6 +103,21 @@ case "$phase" in
     phase4|phase5) workflow_mode="langgraph"; needs_langflow=false ;;
 esac
 
+if [[ "$reuse_langflow" == true && "$phase" != "phase1" ]]; then
+    echo "--reuse-langflow is supported only with --phase1." >&2
+    exit 2
+fi
+
+# A phase should verify the framework it actually starts.  Importing CrewAI and
+# AutoGen during the LangFlow/LangGraph preflight is needlessly expensive and
+# can delay Phase 1 long enough for a VDI evaluator to conclude that its local
+# services never became ready.
+case "$phase" in
+    phase1|phase4|phase5) application_imports="import fastapi, requests, langgraph" ;;
+    phase2) application_imports="import fastapi, requests, langgraph, crewai" ;;
+    phase3) application_imports="import fastapi, requests, langgraph, autogen" ;;
+esac
+
 if [[ "$phase" == "phase5" && "$api_only" == true ]]; then
     echo "Phase 5 includes frontend deployment readiness and cannot use --api-only." >&2
     exit 2
@@ -141,7 +160,7 @@ if [[ "$needs_langflow" == true && ! -x "$langflow_python" ]]; then
 fi
 
 if [[ "$no_install" == true ]]; then
-    if ! "$venv_python" -c 'import fastapi, requests, langgraph, crewai, autogen' >/dev/null 2>&1; then
+    if ! "$venv_python" -c "$application_imports" >/dev/null 2>&1; then
         echo "The application environment is incomplete. Run ./start.sh --$phase once without --no-install." >&2
         exit 1
     fi
@@ -196,6 +215,8 @@ export LANGFLOW_AUTO_LOGIN="true"
 export LANGFLOW_SKIP_AUTH_AUTO_LOGIN="true"
 export LANGFLOW_CORS_ORIGINS="http://127.0.0.1:7860,http://localhost:7860"
 export DO_NOT_TRACK="true"
+export CREWAI_TRACING_ENABLED="false"
+export CREWAI_TESTING="true"
 export LANGSMITH_TRACING="false"
 export LANGCHAIN_TRACING_V2="false"
 export XDG_DATA_HOME="$project_root/.runtime-data"
@@ -284,10 +305,10 @@ if [[ "$phase_requested" == true ]]; then
     if [[ "$api_only" == false ]]; then
         stop_stale_project_listener frontend 5173 "vite"
     fi
-    if [[ "$needs_langflow" == true ]]; then
-        # Assessment VDIs may prelaunch a global /Software/langenv LangFlow.
-        # It must yield the evaluator's fixed port to this project's pinned
-        # runtime, but no other external command is eligible for termination.
+    if [[ "$needs_langflow" == true && "$reuse_langflow" == false ]]; then
+        # The normal project-managed profile replaces a conflicting process
+        # with this checkout's pinned runtime.  --reuse-langflow deliberately
+        # leaves a VDI-managed service running on the evaluator's fixed port.
         stop_stale_project_listener langflow 7860 "langflow run" true
     fi
 fi
@@ -351,7 +372,21 @@ if [[ "$needs_langflow" == true ]]; then
     # shellcheck disable=SC1091
     . "$project_root/.env"
     set +a
+    # The VDI evaluator can be launched by the user systemd manager instead of
+    # the terminal that sourced .env.  Publish the *verified server-issued*
+    # key to that manager so those evaluator processes send the same x-api-key
+    # as registration and the local smoke test.  This is session-scoped and
+    # deliberately never prints the credential.
+    if command -v systemctl >/dev/null 2>&1 && systemctl --user import-environment LANGFLOW_API_KEY; then
+        echo "Published the verified LANGFLOW_API_KEY to the user systemd environment."
+    else
+        echo "WARNING: Could not publish LANGFLOW_API_KEY to user systemd; evaluator processes must load .env." >&2
+    fi
     "$langflow_python" "$project_root/scripts/register_langflow_flow.py"
+    if [[ "$reuse_langflow" == true ]]; then
+        "$langflow_python" "$project_root/scripts/configure_langflow_model.py" \
+            --env-file "$project_root/.env"
+    fi
     "$langflow_python" "$project_root/scripts/phase1_diagnostics.py" \
         --env-file "$project_root/.env" \
         --output "$project_root/phase1_diagnostics.txt"

@@ -91,3 +91,46 @@ def test_reference_acceptance_queries_work_without_an_api_key(tmp_path):
 
     deleted = workflow.run("Remove the conference chairs from my cart.", session)
     assert deleted["cart"]["items"] == []
+
+
+def test_crewai_result_reconciles_agent_mutations_and_applies_request_once(tmp_path):
+    settings = Settings(
+        database_path=tmp_path / "crewai-reconcile.db",
+        openai_api_key="configured-for-test",
+        openai_base_url="https://example.invalid/v1",
+        openai_model="gpt-4o-mini",
+        gemini_api_key=None,
+        gemini_model="gemini-3.5-flash",
+        workflow_mode="crewai",
+    )
+    # Construct only the shared supervisor. This test does not need to build or
+    # call the external CrewAI provider.
+    workflow = ShopWorkflow.__new__(ShopWorkflow)
+    workflow.store = ShopStore(settings.database_path)
+    workflow.settings = settings
+    session = "crewai-reconcile"
+    before = workflow.store.get_cart(session)
+
+    # Model an agent retry that added the wrong product before returning.
+    workflow.store.add_to_cart(session, product_id=2, quantity=4)
+    added = workflow._framework_result(
+        "Add 2 office chairs to my cart.", session, "Crew completed.", before
+    )
+
+    assert [(item["title"], item["quantity"]) for item in added["cart"]["items"]] == [
+        ("AeroMesh Office Chair", 2)
+    ]
+    assert any(item["tool"] == "AddProductToCart" for item in added["tool_results"])
+    assert added["trace"][0] == {
+        "agent": "CrewAI Multi-Agent Runtime",
+        "status": "completed",
+        "detail": "Specialized agents collaborated and returned a workflow result.",
+    }
+
+    updated = workflow._framework_result(
+        "Update office chairs quantity to 3.",
+        session,
+        "Crew completed.",
+        workflow.store.get_cart(session),
+    )
+    assert updated["cart"]["items"][0]["quantity"] == 3

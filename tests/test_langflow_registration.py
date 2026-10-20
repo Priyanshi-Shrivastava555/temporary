@@ -1,7 +1,13 @@
 import json
 from pathlib import Path
 
-from scripts.register_langflow_flow import _choose_canonical, _flow_signature, _matching_flows, _update_flow
+from scripts.register_langflow_flow import (
+    _choose_canonical,
+    _flow_signature,
+    _matching_flows,
+    _update_flow,
+    adapt_flow_for_catalog,
+)
 
 
 class FakeResponse:
@@ -64,6 +70,43 @@ def test_flow_signature_detects_executable_component_change():
     }
 
     assert _flow_signature(existing) != _flow_signature(desired)
+
+
+def test_flow_signature_ignores_deployment_local_model_configuration():
+    desired = {
+        "data": {
+            "nodes": [{
+                "id": "model",
+                "data": {"type": "ext:shop_buddy:ShopBuddyModelComponent@extra", "node": {
+                    "template": {
+                        "openai_api_key": {"value": ""},
+                        "openai_base_url": {"value": ""},
+                        "openai_model": {"value": "gpt-4o-mini"},
+                    },
+                    "outputs": [{"name": "model"}],
+                }},
+            }],
+            "edges": [],
+        }
+    }
+    live = {
+        "data": {
+            "nodes": [{
+                "id": "model",
+                "data": {"type": "ext:shop_buddy:ShopBuddyModelComponent@extra", "node": {
+                    "template": {
+                        "openai_api_key": {"value": "server-secret"},
+                        "openai_base_url": {"value": "https://proxy.example/v1"},
+                        "openai_model": {"value": "gpt-4o-mini"},
+                    },
+                    "outputs": [{"name": "model"}],
+                }},
+            }],
+            "edges": [],
+        }
+    }
+
+    assert _flow_signature(live) == _flow_signature(desired)
 
 
 def test_flow_signature_detects_evaluator_name_change():
@@ -129,3 +172,81 @@ def test_export_uses_evaluator_name_and_external_model_mode():
     ]
     assert len(model_edges) == 3
     assert all(edge["data"]["targetHandle"]["inputTypes"] == ["LanguageModel"] for edge in model_edges)
+
+
+def test_export_uses_distinct_labels_for_all_five_custom_tools():
+    flow_path = Path(__file__).resolve().parents[1] / "langflow" / "shop_buddy.flow.json"
+    flow = json.loads(flow_path.read_text(encoding="utf-8"))
+    tool_nodes = {
+        node["data"]["type"]: node["data"]["display_name"]
+        for node in flow["data"]["nodes"]
+        if str(node["data"].get("type", "")).startswith("ext:shop_buddy:")
+        and node["data"]["type"] != "ext:shop_buddy:ShopBuddyModelComponent@extra"
+    }
+
+    assert tool_nodes == {
+        "ext:shop_buddy:SearchProductsComponent@extra": "Search Products",
+        "ext:shop_buddy:AddProductToCartComponent@extra": "AddProductToCart",
+        "ext:shop_buddy:UpdateCartItemComponent@extra": "UpdateCartItem",
+        "ext:shop_buddy:DeleteCartItemComponent@extra": "DeleteCartItem",
+        "ext:shop_buddy:GetCartItemsComponent@extra": "GetCartItems",
+    }
+
+
+def test_vdi_catalog_adapter_rebases_builtins_and_model_edges():
+    flow = {
+        "data": {
+            "nodes": [
+                {
+                    "id": "input",
+                    "data": {"type": "ChatInput", "display_name": "Input", "node": {
+                        "display_name": "Input",
+                        "template": {"input_value": {"value": "saved input"}, "code": {"value": "from lfx"}},
+                    }},
+                },
+                {
+                    "id": "agent",
+                    "data": {"type": "Agent", "display_name": "Orchestrator", "node": {
+                        "display_name": "Orchestrator",
+                        "template": {
+                            "model": {"value": "", "type": "other"},
+                            "system_prompt": {"value": "saved prompt"},
+                            "code": {"value": "from lfx"},
+                        },
+                    }},
+                },
+            ],
+            "edges": [{
+                "target": "agent",
+                "targetHandle": "{œfieldNameœ: œmodelœ, œtypeœ: œotherœ}",
+                "data": {"targetHandle": {"fieldName": "model", "inputTypes": ["LanguageModel"], "type": "other"}},
+            }],
+        }
+    }
+    catalog = {
+        "inputs": {"ChatInput": {"display_name": "Chat Input", "template": {
+            "input_value": {"value": ""}, "code": {"value": "from langflow"},
+        }}},
+        "agents": {"Agent": {"display_name": "Agent", "template": {
+            "agent_llm": {"value": "OpenAI", "input_types": [], "type": "str"},
+            "system_prompt": {"value": "native prompt"},
+            "add_current_date_tool": {"value": False},
+            "code": {"value": "from langflow"},
+        }}},
+    }
+
+    adapted = adapt_flow_for_catalog(flow, catalog)
+    input_node, agent = adapted["data"]["nodes"]
+    edge = adapted["data"]["edges"][0]
+
+    assert input_node["data"]["node"]["template"]["input_value"]["value"] == "saved input"
+    assert input_node["data"]["node"]["template"]["code"]["value"] == "from langflow"
+    assert agent["data"]["node"]["template"]["system_prompt"]["value"] == "saved prompt"
+    assert agent["data"]["node"]["template"]["code"]["value"] == "from langflow"
+    assert agent["data"]["node"]["template"]["agent_llm"]["value"] == "Custom"
+    assert agent["data"]["node"]["template"]["agent_llm"]["input_types"] == ["LanguageModel"]
+    assert edge["data"]["targetHandle"] == {
+        "fieldName": "agent_llm", "inputTypes": ["LanguageModel"], "type": "str",
+    }
+    assert "œfieldNameœ: œagent_llmœ" in edge["targetHandle"]
+    assert "œtypeœ: œstrœ" in edge["targetHandle"]
