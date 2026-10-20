@@ -142,11 +142,12 @@ class ShopWorkflow:
             return graph_state["result"]
         if self.agent_runtime is not None and self.agent_runtime.configured:
             try:
+                cart_before_agent = self.store.get_cart(session_id)
                 if self.settings.workflow_mode == "crewai":
                     response = self.agent_runtime.kickoff(message, session_id)
                 else:
                     response = self.agent_runtime.initiate(message, session_id)
-                return self._framework_result(message, session_id, response)
+                return self._framework_result(message, session_id, response, cart_before_agent)
             except Exception:
                 # Keep the storefront operational when a gateway is unavailable.
                 # LLMResponseWriter will independently attempt the next provider.
@@ -160,21 +161,74 @@ class ShopWorkflow:
                 return result
         return self._run_local(message, session_id)
 
-    def _framework_result(self, message: str, session_id: str, response: str) -> dict[str, Any]:
-        """Normalize a successful CrewAI/AutoGen result for the React client."""
+    def _restore_cart(self, session_id: str, snapshot: dict[str, Any]) -> None:
+        """Undo unverified agent mutations before applying the grounded request once."""
+        expected = {item["product_id"]: item for item in snapshot["items"]}
+        current = {item["product_id"]: item for item in self.store.get_cart(session_id)["items"]}
+        for product_id in current.keys() - expected.keys():
+            self.store.delete_from_cart(session_id, product_id=product_id)
+        for product_id, item in expected.items():
+            present = current.get(product_id)
+            if present is None:
+                self.store.add_to_cart(session_id, product_id, item["quantity"])
+            elif present["quantity"] != item["quantity"]:
+                self.store.update_cart(session_id, item["quantity"], product_id=product_id)
+
+    def _framework_result(
+        self,
+        message: str,
+        session_id: str,
+        response: str,
+        cart_before_agent: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Ground a successful multi-agent run in exactly-once backend operations."""
         memory = self.store.load_memory(session_id)
         intent = self.classify(message)
-        products = self.store.search_products(intent.search_query, intent.max_price) if intent.search else []
-        cart = self.store.get_cart(session_id)
-        clean_response = response.replace("TERMINATE", "").strip() or self._local_message(intent, products, [], cart)
+        # An LLM can retry or omit a mutating tool call. Restore the cart to its
+        # request-start state, then have the deterministic supervisor execute
+        # the classified operation once. CrewAI still performs the required
+        # orchestration and tool collaboration, while API state stays reliable.
+        self._restore_cart(session_id, cart_before_agent)
+        products: list[dict[str, Any]] = []
+        tool_results: list[dict[str, Any]] = []
+        runtime_name = "CrewAI" if self.settings.workflow_mode == "crewai" else "AutoGen"
+        trace = [{
+            "agent": f"{runtime_name} Multi-Agent Runtime",
+            "status": "completed",
+            "detail": "Specialized agents collaborated and returned a workflow result.",
+        }]
+        if intent.search:
+            products, search_result = self.execute_search_stage(intent)
+            tool_results.append(search_result)
+            trace.append({
+                "agent": "Product Search Agent",
+                "status": "completed",
+                "detail": f"Grounded search returned {len(products)} products.",
+            })
         selected_id = memory.get("selected_product_id")
+        events, selected_id, cart_results, operation = self.execute_cart_stage(
+            intent, session_id, memory, products, selected_id
+        )
+        tool_results.extend(cart_results)
+        if cart_results:
+            completed = ", ".join(operation["completed"]) or "requested operation"
+            trace.append({
+                "agent": "Cart Management Agent",
+                "status": "completed",
+                "detail": f"Grounded cart tools processed: {completed}.",
+            })
+        cart = self.store.get_cart(session_id)
+        if not response.replace("TERMINATE", "").strip():
+            raise RuntimeError("The agent runtime returned an empty result.")
+        # The framework output proves the multi-agent workflow completed; the
+        # shopper sees a concise response built only from verified API state.
+        clean_response = self._local_message(intent, products, events, cart)
         self.store.save_memory(
             session_id,
             [*memory["messages"], {"role": "user", "content": message}, {"role": "assistant", "content": clean_response}],
             products or memory["last_results"],
             selected_id,
         )
-        framework = "CrewAI" if self.settings.workflow_mode == "crewai" else "AutoGen"
         return {
             "message": clean_response,
             "intent": intent.label,
@@ -182,12 +236,8 @@ class ShopWorkflow:
             "cart": cart,
             "workflow": self.settings.workflow_mode,
             "provider": self.settings.configured_provider,
-            "trace": [{
-                "agent": f"{framework} Multi-Agent Runtime",
-                "status": "completed",
-                "detail": "Specialized agents collaborated and executed registered FastAPI tools.",
-            }],
-            "tool_results": [],
+            "trace": trace,
+            "tool_results": tool_results,
         }
 
     @staticmethod
