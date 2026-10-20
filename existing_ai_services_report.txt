@@ -1,0 +1,5 @@
+Shop Buddy existing AI service capability report
+Run this on the evaluation VDI before restarting any services:
+./.venv/bin/python scripts/inspect_existing_ai_services.py --env-file .env --output existing_ai_services_report.txt
+
+This placeholder intentionally contains no machine-specific data or secrets.

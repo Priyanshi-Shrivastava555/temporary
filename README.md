@@ -85,6 +85,16 @@ If a previous Phase 1 run saved an older copy of the flow, restart it with `./st
 
 Phase 1 also creates and verifies a LangFlow service API key, saves it as `LANGFLOW_API_KEY` in the ignored local `.env`, and uses that key for the smoke run. This is distinct from `OPENAI_API_KEY`: it authenticates the VDI evaluator to LangFlow itself and is never committed.
 
+Before replacing an evaluator-provided LangFlow/LangChain service, capture its ownership, ports, package versions, authentication behavior, OpenAPI routes, installed component catalog, and existing flows with the read-only collector below. The generated report is redacted and safe to commit: secrets are represented only by short one-way fingerprints.
+
+```bash
+./.venv/bin/python scripts/inspect_existing_ai_services.py \
+  --env-file .env \
+  --output existing_ai_services_report.txt
+```
+
+Run the collector before `./start.sh`, because restarting first loses the evidence needed to determine whether the VDI's preinstalled service should be reused or updated. It does not execute a flow, call an AI provider, alter LangFlow, or consume an evaluation attempt.
+
 The reference proxy belongs in `OPENAI_BASE_URL`. If you use an official OpenAI key instead of that proxy, leave `OPENAI_BASE_URL` empty so the SDK uses `https://api.openai.com/v1`. Gemini defaults to the current `gemini-3.5-flash` model; either model remains configurable in `.env`.
 
 ## Accounts and personalization
