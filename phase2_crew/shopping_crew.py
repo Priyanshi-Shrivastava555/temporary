@@ -26,6 +26,10 @@ if str(_PROJECT_ROOT) not in sys.path:
 # the required configuration behavior.
 load_dotenv(_PROJECT_ROOT / ".env", override=True)
 
+_database_path = Path(os.getenv("SHOP_BUDDY_DB_PATH", "data/shop_buddy.db"))
+if not _database_path.is_absolute():
+    os.environ["SHOP_BUDDY_DB_PATH"] = str((_PROJECT_ROOT / _database_path).resolve())
+
 _storage_root = Path(os.getenv("CREWAI_STORAGE_DIR", "crewai"))
 if not _storage_root.is_absolute():
     _storage_root = _PROJECT_ROOT / ".runtime-data" / _storage_root
